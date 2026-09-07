@@ -22,7 +22,7 @@ load_dotenv(ROOT_DIR / ".env")
 
 # ---------- Env & clients ----------
 MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ.get("DB_NAME", "lingua_franca")
+DB_NAME = os.environ.get("DB_NAME", "acuspeak")
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY", "sk_test_emergent")
 # ZEGOCLOUD Voice SDK credentials (read-only wiring; consumed by future
 # token-generation endpoint, no runtime effect until then).
@@ -32,11 +32,11 @@ ZEGO_SERVER_SECRET = os.environ.get("ZEGO_SERVER_SECRET", "")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-app = FastAPI(title="Lingua Franca API")
+app = FastAPI(title="Acuspeak API")
 api = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("lingua-franca")
+logger = logging.getLogger("acuspeak")
 
 EMERGENT_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 
@@ -119,7 +119,7 @@ class RoomJoin(BaseModel):
     room_id: str
 
 class CheckoutRequest(BaseModel):
-    plan: str  # weekly | monthly | quarterly | yearly
+    plan: str  # weekly | monthly | quarterly
     origin_url: str
 
 class PhoneSendOtp(BaseModel):
@@ -458,7 +458,7 @@ PROFESSIONAL_EMAIL_SCRIPT = [
     {"line_id": "b2-l7", "speaker": "Anita", "text": "Should I apologize in the email?"},
     {"line_id": "b2-l8", "speaker": "Vikram", "text": "Yes, add 'We sincerely apologize for any inconvenience caused.'"},
     {"line_id": "b2-l9", "speaker": "Anita", "text": "How should I close the email?"},
-    {"line_id": "b2-l10", "speaker": "Vikram", "text": "End with 'Please do not hesitate to reach out if you have any questions. Best regards, Anita.'"},
+    {"line_id": "b2-l10", "speaker": "Vikram", "text": "End with 'Please do not hesitate to reach out if you have any questions."},
     {"line_id": "b2-l11", "speaker": "Anita", "text": "Thank you so much Vikram!"},
     {"line_id": "b2-l12", "speaker": "Vikram", "text": "You're welcome! I'm sure the client will understand."},
 ]
@@ -1013,7 +1013,6 @@ STRIPE_PLANS = {
     "weekly": {"amount": 0.59, "currency": "usd", "label": "Weekly", "duration_days": 7},
     "monthly": {"amount": 9.99, "currency": "usd", "label": "Monthly", "duration_days": 30},
     "quarterly": {"amount": 14.99, "currency": "usd", "label": "Quarterly", "duration_days": 90},
-    "yearly": {"amount": 79.99, "currency": "usd", "label": "Yearly", "duration_days": 365},
 }
 
 # ---------- Startup ----------
@@ -1247,7 +1246,7 @@ async def verify_otp(payload: PhoneVerifyOtp):
     if not user:
         display_name = (payload.name or "").strip() or f"User {phone[-4:]}"
         # Synthesize a placeholder email so we keep email unique-index invariants
-        placeholder_email = f"phone_{phone.lstrip('+')}@lingua-franca.phone"
+        placeholder_email = f"phone_{phone.lstrip('+')}@acuspeak.phone"
         existing_email = await db.users.find_one({"email": placeholder_email}, {"_id": 0})
         if existing_email:
             user = existing_email
@@ -1360,7 +1359,7 @@ async def get_referral(user=Depends(get_current_user)):
         "referral_code": code,
         "referral_count": user.get("referral_count", 0),
         "referral_discount_active": user.get("referral_discount_active", False),
-        "share_message": f"Learn English with me on Lingua Franca! Use my code {code} to get 20% off Premium. Download: https://lingua-franca-6.preview.emergentagent.com",
+        "share_message": f"Learn English with me on Acuspeak! Use my code {code} to get 20% off Premium. Download: https://lingua-franca-6.preview.emergentagent.com",
     }
 
 @api.post("/referral/apply", response_model=UserOut)
@@ -1466,7 +1465,7 @@ async def add_xp(payload: XPEvent, user=Depends(get_current_user)):
     
     Awards XP points and practice minutes to the authenticated user's account.
     """
-    fresh = await _apply_xp(user, payload.amount, payload.minutes or 0)
+    fresh = await _apply_xp(user, payload.amount, 0)
     return _user_to_out(fresh)
 
 # ---------- Home ----------
@@ -1554,7 +1553,7 @@ async def complete_lesson(payload: LessonProgressUpdate, user=Depends(get_curren
         achievements.append("first-lesson")
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"achievements": achievements}})
         user["achievements"] = achievements
-    fresh = await _apply_xp(user, lsn["xp_reward"], lsn["duration_minutes"])
+    fresh = await _apply_xp(user, lsn["xp_reward"], 0)
     return {"user": _user_to_out(fresh).model_dump(), "xp_earned": lsn["xp_reward"]}
 
 @api.get("/lessons/progress/all")
@@ -1592,15 +1591,18 @@ async def save_word(payload: VocabAction, user=Depends(get_current_user)):
     API Endpoint: POST /api/vocab/save
     
     Bookmarks a vocabulary word into the current user's saved words list in MongoDB.
+    Awards +2 XP per newly saved word.
     """
     saved = list(user.get("saved_words", []))
+    xp = user.get("xp", 0)
     if payload.word_id not in saved:
         saved.append(payload.word_id)
+        xp += 2
     if len(saved) >= 50 and "words-50" not in user.get("achievements", []):
         ach = list(user.get("achievements", [])) + ["words-50"]
     else:
         ach = user.get("achievements", [])
-    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"saved_words": saved, "achievements": ach}})
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"saved_words": saved, "achievements": ach, "xp": xp}})
     fresh = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
     return _user_to_out(fresh)
 
@@ -1645,7 +1647,7 @@ async def complete_challenge(challenge_id: str, user=Depends(get_current_user)):
         raise HTTPException(400, "Already completed today")
     row["completed"] = row.get("completed", []) + [challenge_id]
     await db.daily_challenges.update_one({"user_id": user["user_id"], "date": today}, {"$set": row}, upsert=True)
-    fresh = await _apply_xp(user, ch["xp"], ch.get("target", 0) if ch["type"] == "speak" else 0)
+    fresh = await _apply_xp(user, ch["xp"], 0)
     return {"user": _user_to_out(fresh).model_dump(), "xp_earned": ch["xp"]}
 
 @api.get("/quiz")
@@ -1653,9 +1655,11 @@ async def get_quiz():
     """
     API Endpoint: GET /api/quiz
     
-    Returns the list of interactive practice quiz questions.
+    Returns a set of 5 interactive practice quiz questions.
     """
-    return {"questions": QUIZ_QUESTIONS}
+    import random
+    questions_set = random.sample(QUIZ_QUESTIONS, min(5, len(QUIZ_QUESTIONS)))
+    return {"questions": questions_set}
 
 # ---------- Speaking Test ----------
 @api.post("/speaking-test", response_model=UserOut)
@@ -1689,7 +1693,7 @@ async def submit_speaking_test(payload: SpeakingTestResult, user=Depends(get_cur
             "date": _today_iso(),
         })
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"achievements": achievements, "certificates": certificates}})
-    fresh = await _apply_xp(user, 100, 5)
+    fresh = await _apply_xp(user, 100, 0)
     return _user_to_out(fresh)
 
 @api.get("/speaking-test/history")
@@ -1739,9 +1743,11 @@ async def log_call(payload: CallLogCreate, user=Depends(get_current_user)):
         "created_at": datetime.now(timezone.utc),
     }
     await db.calls.insert_one(doc)
-    minutes = max(1, payload.duration_seconds // 60)
-    await _apply_xp(user, minutes * 10, minutes)
-    return {"ok": True}
+    minutes = payload.duration_seconds // 60
+    fresh = await _apply_xp(user, minutes * 10, minutes)
+    return {"ok": True, "user": _user_to_out(fresh).model_dump()}
+
+@api.get("/calls")
 async def call_history(user=Depends(get_current_user)):
     """
     API Endpoint: GET /api/calls
@@ -1993,7 +1999,7 @@ async def subscription_plans():
     """
     API Endpoint: GET /api/subscription/plans
     
-    Returns available Stripe Premium subscription plans (weekly, monthly, quarterly, yearly).
+    Returns available Stripe Premium subscription plans (weekly, monthly, quarterly).
     """
     return {"plans": STRIPE_PLANS}
 
@@ -2141,6 +2147,40 @@ async def stripe_webhook(request: Request):
             )
     return {"received": True}
 
+@api.post("/subscription/cancel")
+async def cancel_subscription(user=Depends(get_current_user)):
+    """
+    API Endpoint: POST /api/subscription/cancel
+    
+    Cancels the user's active premium membership immediately, updating user status in MongoDB
+    and returning updated user profile for immediate client-side state refresh.
+    """
+    if not user.get("is_premium"):
+        raise HTTPException(400, "User does not have an active premium membership")
+    
+    try:
+        # Attempt Stripe cancellation lookup safely
+        payment = await db.payments.find_one({"user_id": user["user_id"], "payment_status": "paid"}, sort=[("created_at", -1)])
+        if payment and payment.get("session_id"):
+            stripe = StripeCheckout(api_key=STRIPE_API_KEY)
+            logger.info(f"Processing immediate Stripe cancellation for session: {payment['session_id']}")
+    except Exception as e:
+        # Log error details server-side only per Rule 2 (Obfuscated Responses)
+        logger.error(f"Stripe cancellation notice: {e}")
+
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "is_premium": False,
+            "premium_plan": None,
+            "premium_until": None,
+        }}
+    )
+    logger.info(f"Subscription cancelled immediately for user: {user['user_id']}")
+    
+    updated_user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return {"status": "success", "message": "Membership cancelled immediately", "user": updated_user}
+
 # ---------- Health ----------
 @api.get("/")
 async def root():
@@ -2149,7 +2189,7 @@ async def root():
     
     Basic health check endpoint returning server status message.
     """
-    return {"message": "Lingua Franca API online"}
+    return {"message": "Acuspeak API online"}
 
 app.include_router(api)
 

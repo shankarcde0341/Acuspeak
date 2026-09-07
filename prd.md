@@ -1,9 +1,9 @@
-# Project Overview & PRD: Lingua Franca
+# Project Overview & PRD: Acuspeak
 
 ## 1. Executive Summary
 
 - Executive Brief
-  - Lingua Franca is a mobile-first English speaking practice platform that connects learners with bite-sized lessons, peer voice calls, challenges, and premium learning paths.
+  - Acuspeak is a mobile-first English speaking practice platform that connects learners with bite-sized lessons, peer voice calls, challenges, and premium learning paths.
   - The app combines live partner matching, guided content, and gamification to help users build speaking confidence, vocabulary, and real-world conversation skills.
 
 - Problem Statement
@@ -12,7 +12,7 @@
 
 - Proposed Solution & Unique Value Proposition (UVP)
   - Provide a single app where learners can join live rooms, match with real peers for voice practice, complete lessons and speaking tests, and earn recognition through streaks, certificates, and leaderboards.
-  - Lingua Franca stands out through peer voice interactions, phone and OAuth onboarding, referrals and premium subscriptions, and an integrated social safety/feedback loop.
+  - Acuspeak stands out through peer voice interactions, phone and OAuth onboarding, referrals and premium subscriptions, and an integrated social safety/feedback loop.
 
 ## 2. Target Audience & User Personas
 
@@ -195,7 +195,7 @@
   - Do not alter existing session and auth flow logic in `frontend/src/context/AuthContext.tsx` and `/api/auth/*` endpoints unless fixing critical bugs.
   - Do not change the ZEGOCLOUD token generation contract or client-side room ID handling; room IDs must remain server-issued.
   - Do not modify Stripe plan IDs or pricing logic without syncing with backend `STRIPE_PLANS` and Stripe dashboard.
-  - Do not change the app name or brand identity from Lingua Franca in the repository without stakeholder approval.
+  - App name and brand identity is Acuspeak across the repository.
 
 ## Appendix: Immediate Priorities for AI Agents
 

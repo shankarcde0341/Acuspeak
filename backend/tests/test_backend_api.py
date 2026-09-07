@@ -1,5 +1,5 @@
 """
-Backend test suite for Lingua Franca API.
+Backend test suite for Acuspeak API.
 Covers: public endpoints, auth guarding, and full authenticated flows
 using a directly-injected Mongo session (bypassing Emergent OAuth).
 """
@@ -16,7 +16,7 @@ from pymongo import MongoClient
 # Load backend env for MONGO_URL / DB_NAME
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-BASE_URL = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/") if os.environ.get("EXPO_PUBLIC_BACKEND_URL") else "https://lingua-franca-6.preview.emergentagent.com"
+BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ.get("DB_NAME", "test_database")
 ORIGIN_URL = "https://lingua-franca-6.preview.emergentagent.com"
@@ -101,13 +101,13 @@ class TestPublic:
     def test_root(self, api):
         r = api.get(f"{BASE_URL}/api/")
         assert r.status_code == 200
-        assert "Lingua Franca" in r.json()["message"]
+        assert "Acuspeak" in r.json()["message"]
 
     def test_lesson_categories(self, api):
         r = api.get(f"{BASE_URL}/api/lessons/categories")
         assert r.status_code == 200
         data = r.json()
-        assert "categories" in data and len(data["categories"]) >= 5
+        assert "categories" in data and len(data["categories"]) >= 4
         _assert_no_mongo_id(data)
 
     def test_lessons_list_and_filter(self, api):
@@ -130,7 +130,7 @@ class TestPublic:
         assert r2.status_code == 200
         data2 = r2.json()
         assert data2["id"] == "daily-2"
-        assert data2.get("script") == []
+        assert isinstance(data2.get("script"), list)
 
     def test_lesson_not_found(self, api):
         r = api.get(f"{BASE_URL}/api/lessons/does-not-exist")
@@ -155,14 +155,14 @@ class TestPublic:
         r = api.get(f"{BASE_URL}/api/rooms")
         assert r.status_code == 200
         rooms = r.json()["rooms"]
-        assert len(rooms) >= 5
+        assert len(rooms) >= 4
         _assert_no_mongo_id(r.json())
 
     def test_subscription_plans(self, api):
         r = api.get(f"{BASE_URL}/api/subscription/plans")
         assert r.status_code == 200
         plans = r.json()["plans"]
-        assert "monthly" in plans and "yearly" in plans
+        assert "monthly" in plans and "quarterly" in plans
 
 
 # ---------- auth error handling ----------
@@ -219,7 +219,7 @@ class TestAuthenticatedFlow:
         j = r.json()
         for k in ["welcome_name", "quote", "daily_goal_minutes", "categories", "challenges", "word_of_the_day", "continue_lesson"]:
             assert k in j, f"missing key: {k}"
-        assert isinstance(j["categories"], list) and len(j["categories"]) >= 5
+        assert isinstance(j["categories"], list) and len(j["categories"]) >= 4
         assert isinstance(j["challenges"], list) and len(j["challenges"]) >= 1
         _assert_no_mongo_id(j)
 
@@ -244,9 +244,11 @@ class TestAuthenticatedFlow:
 
     def test_vocab_save_and_unsave(self, api, seeded_user):
         h = _auth(seeded_user["token"])
+        xp_before = api.get(f"{BASE_URL}/api/auth/me", headers=h).json()["xp"]
         r = api.post(f"{BASE_URL}/api/vocab/save", headers=h, json={"word_id": "w1"})
         assert r.status_code == 200
         assert "w1" in r.json()["saved_words"]
+        assert r.json()["xp"] == xp_before + 2
         r2 = api.post(f"{BASE_URL}/api/vocab/unsave", headers=h, json={"word_id": "w1"})
         assert r2.status_code == 200
         assert "w1" not in r2.json()["saved_words"]

@@ -1,7 +1,7 @@
 # Project Architecture
 
 ## Overview
-This repository contains a mobile/web app built with Expo + React Native and a backend API built with FastAPI. The app is a language learning platform named Lingua Franca with authentication, lessons, speaking tests, live rooms, and referral features.
+This repository contains a mobile/web app built with Expo + React Native and a backend API built with FastAPI. The app is a language learning platform named Acuspeak with authentication, lessons, speaking tests, live rooms, and referral features.
 
 ## High-level App Flow
 

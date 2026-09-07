@@ -21,7 +21,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 BASE_URL = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ.get("DB_NAME", "lingua_franca")
+DB_NAME = os.environ.get("DB_NAME", "acuspeak")
 
 mongo = MongoClient(MONGO_URL)
 db = mongo[DB_NAME]
@@ -367,7 +367,7 @@ class TestCheckoutReferralDiscount:
 
     @pytest.mark.parametrize("plan,base,discounted", [
         ("monthly", 9.99, 7.99),
-        ("yearly", 79.99, 63.99),
+        ("quarterly", 14.99, 11.99),
     ])
     def test_checkout_with_discount(self, api_client, plan, base, discounted):
         pA, pB, token, user = self._login_with_discount(api_client)

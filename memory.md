@@ -1,4 +1,4 @@
-# Lingua Franca — Agent Memory File
+# Acuspeak — Agent Memory File
 
 > **Purpose:** This file is the single source of truth for any AI agent working on this project.
 > Read this file BEFORE making any changes. Update the **Change Log** section after every successful change.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| **Name** | Lingua Franca |
+| **Name** | Acuspeak |
 | **Type** | Mobile-first English speaking practice app |
 | **Platform** | Expo / React Native (web-compatible via Expo Web) |
 | **Target Audience** | Indian English learners (beginners → advanced), job seekers, travelers, working professionals who want to improve spoken English fluency through structured lessons and interactive conversation practice |
@@ -95,7 +95,7 @@ Lingua_app/
 | Variable | Notes |
 |---|---|
 | `MONGO_URL` | **Required.** MongoDB connection string |
-| `DB_NAME` | Optional; defaults to `lingua_franca` |
+| `DB_NAME` | Optional; defaults to `acuspeak` |
 | `STRIPE_API_KEY` | Stripe secret key (`sk_test_...` or `sk_live_...`) |
 | `ZEGO_APP_ID` | ZEGOCLOUD App ID |
 | `ZEGO_SERVER_SECRET` | Must be exactly 32 chars for Token04 |
@@ -203,6 +203,7 @@ All routes are prefixed `/api`. Auth requires `Authorization: Bearer <session_to
 | GET | `/subscription/plans` | Available subscription plans |
 | POST | `/subscription/checkout` | Create Stripe checkout session |
 | GET | `/subscription/status/{session_id}` | Poll checkout status |
+| POST | `/subscription/cancel` | Cancel active user subscription |
 | POST | `/webhook/stripe` | Stripe webhook handler |
 | GET | `/zego/token` | Generate ZEGO voice token |
 
@@ -369,6 +370,22 @@ All routes are prefixed `/api`. Auth requires `Authorization: Bearer <session_to
   - Added static require mappings for `interview-10` (`i10-l1` through `i10-l10`) in `DAILY_AUDIO_ASSETS` within `frontend/src/components/ScriptRolePlayer.tsx`.
   - Mapped lines to audio files in `frontend/assets/audio/interview_english/Closing` (`Interviewer_L1.mp3` through `Interviewer_L5.mp3` and `Candidate_L1.mp3` through `Candidate_L5.mp3`).
   - Verified TypeScript compilation (`npx tsc --noEmit`) and Python compilation (`py_compile`) with 0 errors.
+
+- **2026-09-01**: Added Premium Visual Identity (Orange Accents):
+  - **Design Tokens (`frontend/src/theme.ts`)**: Added `premiumOrange` (`#FF7A00`), `premiumOrangeLight`, `premiumOrangeDark`, `gradients.premiumOrange`, and `gradients.premiumOrangeSoft` alongside existing blue design system tokens.
+  - **Reusable Components (`frontend/src/components/ui/`)**: Built `Avatar` component with `isPremium` prop (rendering solid 2.5px orange ring and bottom-right crown/star badge for premium users) and `ProTag` pill component. Re-exported both from `frontend/src/components/ui.tsx`.
+  - **Avatar & Tag Integrations**: Replaced inline profile picture renders with shared `Avatar` component across `index.tsx`, `profile.tsx`, `leaderboard.tsx`, `friends.tsx`, `call-history.tsx`, `room/[id].tsx`, `live.tsx`, and `match.tsx`. Rendered `ProTag` next to premium user names.
+  - **Premium Touchpoints**: Updated `premium.tsx` (CTA button, selected plan card border, ribbon, active plan card badge) and `premium/success.tsx` (confirmation screen icon & continue CTA) with warm orange accents.
+  - **TypeScript Verification**: Confirmed `npx tsc --noEmit` on frontend passed with 0 errors.
+  - **Compliance**: Confirmed zero database schema and security middleware changes were made.
+
+- **2026-09-01**: Immediate Subscription Cancellation & State Revocation:
+  - **Confirmation Dialog Copy**: Updated `membership.tsx` alert text to `"Are you sure you want to cancel? You'll lose premium features immediately — this cannot be undone for the current billing period."` with `"Cancel Membership"` (destructive) and `"Keep My Membership"` (cancel) buttons.
+  - **Immediate Backend Revocation (`backend/server.py`)**: Enhanced `POST /api/subscription/cancel` route to revoke `is_premium`, `premium_plan`, and `premium_until` immediately in MongoDB, handling Stripe logs safely server-side without exposing internal traces to client. Returns updated user profile.
+  - **Immediate Client-Side State Refresh**: Invokes `refresh()` from `AuthContext` immediately upon cancellation confirmation, instantly updating `user` state across all app components (`Avatar` orange rings, PRO tags, profile header, leaderboard, membership status card) without requiring a re-login.
+  - **Verification**: Python compilation (`py_compile`) and TypeScript typecheck (`npx tsc --noEmit`) verified with 0 errors.
+
+
 
 
 

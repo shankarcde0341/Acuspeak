@@ -1,4 +1,4 @@
-# Lingua Franca — Product Requirements
+# Acuspeak — Product Requirements
 
 ## Overview
 Premium mobile English speaking practice app (React Native / Expo). Blue & white gradient theme, glassmorphism, rounded UI, smooth motion. Bottom navigation: Home, Practice, Live, Profile.
@@ -20,7 +20,7 @@ Premium mobile English speaking practice app (React Native / Expo). Blue & white
 10. **Achievements** — 8 badges (unlock via streaks/XP/tests/premium/etc.).
 11. **Certificates** — earned via speaking-test 80+.
 12. **Leaderboard** — top-20 global by XP with podium.
-13. **Premium** — Stripe Checkout via `emergentintegrations`. Monthly / Yearly. Success + Cancel screens. Webhook + poll updates `is_premium`.
+13. **Premium** — Stripe Checkout via `emergentintegrations`. Weekly / Monthly / Quarterly. Success + Cancel screens. Webhook + poll updates `is_premium`.
 14. **Privacy Policy, Terms & Conditions** — full text screens.
 15. **Settings** — display name, level, daily goal.
 
