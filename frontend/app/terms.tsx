@@ -6,7 +6,7 @@ import { colors, typography } from "@/src/theme";
 import { ScreenHeader } from "@/src/components/ui";
 
 const SECTIONS = [
-  { h: "Agreement", p: "By using Lingua Franca you agree to these Terms & Conditions. If you do not agree, please stop using the service." },
+  { h: "Agreement", p: "By using Acuspeak you agree to these Terms & Conditions. If you do not agree, please stop using the service." },
   { h: "Account", p: "You&apos;re responsible for the safety of your Google account and any activity that happens under it inside the app." },
   { h: "Acceptable use", p: "Be kind and respectful during voice sessions. Harassment, hate speech, spamming, or sharing sensitive personal data of others is prohibited and may result in account suspension." },
   { h: "Reporting & blocking", p: "You can report or block any user directly during a call. Reports are reviewed by our safety team." },
@@ -14,7 +14,7 @@ const SECTIONS = [
   { h: "Refund policy", p: "All purchases are non-refundable unless required by applicable law." },
   { h: "Certificates", p: "Certificates issued in-app are for practice validation only and do not constitute official qualifications." },
   { h: "Changes", p: "We may update these terms occasionally. Continued use of the app implies acceptance of the updated terms." },
-  { h: "Contact", p: "For legal enquiries reach us at legal@linguafranca.app." },
+  { h: "Contact", p: "For legal enquiries reach us at legal@acuspeak.app." },
 ];
 
 export default function Terms() {

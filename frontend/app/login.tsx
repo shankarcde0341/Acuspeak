@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, TextInput, KeyboardAvoidingView, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, TextInput, KeyboardAvoidingView, ScrollView, Keyboard } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,8 +26,25 @@ export default function LoginScreen() {
   const [name, setName] = useState("");
   const [referral, setReferral] = useState("");
   const [debugCode, setDebugCode] = useState<string | null>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => { if (user) router.replace("/(tabs)"); }, [user, router]);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardVisible(false)
+    );
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const parseSessionId = (url: string): string | null => {
     try {
@@ -50,9 +67,6 @@ export default function LoginScreen() {
   const handleGoogleLogin = useCallback(async () => {
     setBusy(true); setError(null);
     try {
-      // On web, redirect back to /auth (which parses session_id and completes sign-in).
-      // On mobile, use the app's `/auth` deep link — required by Expo Router; without
-      // this an /auth route the redirect returns "Unmatched Route".
       const redirectUrl = Platform.OS === "web"
         ? (typeof window !== "undefined" ? window.location.origin + "/auth" : "")
         : Linking.createURL("auth");
@@ -77,8 +91,6 @@ export default function LoginScreen() {
     }
   }, [signInWithSessionId, router]);
 
-  // Historical fallback: if user lands on /login with a session_id in URL
-  // (e.g., legacy redirect), forward to /auth to complete the exchange there.
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
     const s = parseSessionId(window.location.href);
@@ -120,17 +132,25 @@ export default function LoginScreen() {
       <View style={styles.orb1} />
       <View style={styles.orb2} />
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <View style={styles.top}>
-              <LinearGradient colors={["#93C5FD", "#3B82F6", "#1E40AF"]} style={styles.logo}>
-                <Ionicons name="mic" size={30} color="#fff" />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
+            contentContainerStyle={[styles.scrollContent, !keyboardVisible && { flexGrow: 1, justifyContent: "flex-end" }]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={[styles.top, keyboardVisible && styles.topCompact]}>
+              <LinearGradient colors={["#93C5FD", "#3B82F6", "#1E40AF"]} style={[styles.logo, keyboardVisible && styles.logoCompact]}>
+                <Ionicons name="mic" size={keyboardVisible ? 22 : 30} color="#fff" />
               </LinearGradient>
-              <Text style={styles.brand}>Lingua Franca</Text>
-              <Text style={styles.tag}>Your personal English speaking coach</Text>
+              <Text style={[styles.brand, keyboardVisible && styles.brandCompact]}>Acuspeak</Text>
+              {!keyboardVisible && <Text style={styles.tag}>Your personal English speaking coach</Text>}
             </View>
 
-            <View style={styles.card}>
+            <View style={[styles.card, !keyboardVisible && { marginTop: "auto" }]}>
               {mode === "picker" && (
                 <Animated.View entering={FadeIn.duration(400)}>
                   <Text style={styles.welcome}>Welcome</Text>
@@ -197,7 +217,7 @@ export default function LoginScreen() {
                     />
                   </View>
 
-                  <TouchableOpacity onPress={sendOtp} disabled={busy} activeOpacity={0.9} style={{ marginTop: 20 }} testID="send-otp-btn">
+                  <TouchableOpacity onPress={sendOtp} disabled={busy} activeOpacity={0.9} style={{ marginTop: 18 }} testID="send-otp-btn">
                     <LinearGradient colors={gradients.primary} style={styles.primaryCta}>
                       {busy ? <ActivityIndicator color="#fff" /> : (
                         <>
@@ -236,7 +256,6 @@ export default function LoginScreen() {
                     style={styles.otpInput}
                     keyboardType="number-pad"
                     maxLength={6}
-                    autoFocus
                     testID="otp-input"
                   />
 
@@ -258,7 +277,7 @@ export default function LoginScreen() {
                     testID="signup-referral-input"
                   />
 
-                  <TouchableOpacity onPress={verifyOtp} disabled={busy} activeOpacity={0.9} style={{ marginTop: 20 }} testID="verify-otp-btn">
+                  <TouchableOpacity onPress={verifyOtp} disabled={busy} activeOpacity={0.9} style={{ marginTop: 18 }} testID="verify-otp-btn">
                     <LinearGradient colors={gradients.primary} style={styles.primaryCta}>
                       {busy ? <ActivityIndicator color="#fff" /> : (
                         <>
@@ -269,7 +288,7 @@ export default function LoginScreen() {
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  <TouchableOpacity onPress={sendOtp} style={{ marginTop: 14, alignSelf: "center" }} testID="resend-otp-btn">
+                  <TouchableOpacity onPress={sendOtp} style={{ marginTop: 12, alignSelf: "center" }} testID="resend-otp-btn">
                     <Text style={styles.link}>Resend code</Text>
                   </TouchableOpacity>
 
@@ -288,36 +307,40 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   orb1: { position: "absolute", top: -60, left: -60, width: 240, height: 240, borderRadius: 999, backgroundColor: "rgba(147,197,253,0.15)" },
   orb2: { position: "absolute", bottom: -80, right: -60, width: 260, height: 260, borderRadius: 999, backgroundColor: "rgba(56,189,248,0.18)" },
-  top: { alignItems: "center", marginTop: 48 },
+  scrollContent: { flexGrow: 1, paddingBottom: 16 },
+  top: { alignItems: "center", marginTop: 40, marginBottom: 16 },
+  topCompact: { marginTop: 48, marginBottom: 14 },
   logo: { width: 84, height: 84, borderRadius: 30, alignItems: "center", justifyContent: "center", ...shadow.strong },
-  brand: { ...typography.h1, color: "#fff", marginTop: 16, fontSize: 30 },
+  logoCompact: { width: 44, height: 44, borderRadius: 16 },
+  brand: { ...typography.h1, color: "#fff", marginTop: 14, fontSize: 30 },
+  brandCompact: { fontSize: 20, marginTop: 4 },
   tag: { ...typography.body, color: "rgba(255,255,255,0.72)", marginTop: 6 },
-  card: { marginTop: "auto", marginHorizontal: 20, marginBottom: 20, padding: 26, borderRadius: radii.xl, backgroundColor: "rgba(255,255,255,0.96)", ...shadow.card },
-  welcome: { ...typography.h2 },
-  welcomeSub: { ...typography.body, color: colors.textSecondary, marginTop: 6, marginBottom: 20 },
-  googleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, height: 56, borderRadius: 999, backgroundColor: "#fff", borderWidth: 1.5, borderColor: colors.divider },
-  gIcon: { width: 26, height: 26, borderRadius: 999, backgroundColor: "#EA4335", alignItems: "center", justifyContent: "center" },
-  gIconText: { color: "#fff", fontWeight: "800", fontSize: 16 },
-  googleText: { ...typography.button, color: colors.textPrimary, fontSize: 16 },
-  divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 16 },
+  card: { marginHorizontal: 20, marginBottom: 16, padding: 22, borderRadius: radii.xl, backgroundColor: "rgba(255,255,255,0.96)", ...shadow.card },
+  welcome: { ...typography.h2, fontSize: 22 },
+  welcomeSub: { ...typography.body, color: colors.textSecondary, marginTop: 4, marginBottom: 14, fontSize: 14 },
+  googleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, height: 52, borderRadius: 999, backgroundColor: "#fff", borderWidth: 1.5, borderColor: colors.divider },
+  gIcon: { width: 24, height: 24, borderRadius: 999, backgroundColor: "#EA4335", alignItems: "center", justifyContent: "center" },
+  gIconText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  googleText: { ...typography.button, color: colors.textPrimary, fontSize: 15 },
+  divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 14 },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.divider },
   dividerText: { ...typography.tiny, color: colors.textMuted },
-  phoneBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, height: 56, borderRadius: 999, backgroundColor: colors.primary },
-  phoneText: { ...typography.button, fontSize: 16 },
-  disclaimer: { ...typography.small, color: colors.textSecondary, textAlign: "center", marginTop: 20, lineHeight: 18 },
+  phoneBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, height: 52, borderRadius: 999, backgroundColor: colors.primary },
+  phoneText: { ...typography.button, fontSize: 15 },
+  disclaimer: { ...typography.small, color: colors.textSecondary, textAlign: "center", marginTop: 14, lineHeight: 18, fontSize: 12 },
   link: { color: colors.primary, textDecorationLine: "underline" },
-  error: { ...typography.small, color: colors.danger, marginTop: 12, textAlign: "center" },
-  backLink: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 12, alignSelf: "flex-start" },
+  error: { ...typography.small, color: colors.danger, marginTop: 10, textAlign: "center" },
+  backLink: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 10, alignSelf: "flex-start" },
   backText: { ...typography.small, color: colors.primary, fontFamily: "Manrope_700Bold" },
   phoneRow: { flexDirection: "row", gap: 8 },
   ccBox: { minWidth: 72 },
-  ccInput: { height: 54, borderRadius: radii.lg, backgroundColor: "#F1F5F9", paddingHorizontal: 12, fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: "center", color: colors.textPrimary },
-  phoneInput: { flex: 1, height: 54, borderRadius: radii.lg, backgroundColor: "#F1F5F9", paddingHorizontal: 16, fontFamily: "Manrope_500Medium", fontSize: 16, color: colors.textPrimary },
-  primaryCta: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, height: 56, borderRadius: 999, ...shadow.strong },
-  primaryCtaText: { ...typography.button, fontSize: 16 },
-  otpInput: { height: 60, borderRadius: radii.lg, backgroundColor: "#F1F5F9", fontFamily: "Outfit_700Bold", fontSize: 26, letterSpacing: 12, textAlign: "center", color: colors.textPrimary, marginBottom: 12 },
-  textInput: { height: 50, borderRadius: radii.lg, backgroundColor: "#F1F5F9", paddingHorizontal: 16, fontFamily: "Manrope_500Medium", fontSize: 14, color: colors.textPrimary, marginTop: 10 },
-  mockNote: { ...typography.small, color: colors.textMuted, textAlign: "center", marginTop: 14, fontStyle: "italic" },
-  mockChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF3C7", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, alignSelf: "flex-start", marginTop: 4, marginBottom: 12 },
+  ccInput: { height: 50, borderRadius: radii.lg, backgroundColor: "#F1F5F9", paddingHorizontal: 12, fontFamily: "Manrope_700Bold", fontSize: 15, textAlign: "center", color: colors.textPrimary },
+  phoneInput: { flex: 1, height: 50, borderRadius: radii.lg, backgroundColor: "#F1F5F9", paddingHorizontal: 16, fontFamily: "Manrope_500Medium", fontSize: 15, color: colors.textPrimary },
+  primaryCta: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, height: 52, borderRadius: 999, ...shadow.strong },
+  primaryCtaText: { ...typography.button, fontSize: 15 },
+  otpInput: { height: 54, borderRadius: radii.lg, backgroundColor: "#F1F5F9", fontFamily: "Outfit_700Bold", fontSize: 24, letterSpacing: 10, textAlign: "center", color: colors.textPrimary, marginBottom: 10 },
+  textInput: { height: 48, borderRadius: radii.lg, backgroundColor: "#F1F5F9", paddingHorizontal: 16, fontFamily: "Manrope_500Medium", fontSize: 14, color: colors.textPrimary, marginTop: 8 },
+  mockNote: { ...typography.small, color: colors.textMuted, textAlign: "center", marginTop: 10, fontStyle: "italic", fontSize: 12 },
+  mockChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF3C7", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, alignSelf: "flex-start", marginTop: 2, marginBottom: 10 },
   mockChipText: { color: "#78350F", fontFamily: "Manrope_700Bold", fontSize: 12 },
 });

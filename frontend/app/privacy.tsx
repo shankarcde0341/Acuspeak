@@ -6,13 +6,13 @@ import { colors, typography } from "@/src/theme";
 import { ScreenHeader } from "@/src/components/ui";
 
 const SECTIONS = [
-  { h: "Introduction", p: "Welcome to Lingua Franca. Your privacy matters to us. This policy explains what data we collect and how we use it to power your speaking practice." },
+  { h: "Introduction", p: "Welcome to Acuspeak. Your privacy matters to us. This policy explains what data we collect and how we use it to power your speaking practice." },
   { h: "Information we collect", p: "We collect your Google account information (email, name, profile picture) at sign-in, plus content you generate inside the app (progress, saved words, call metadata such as duration, and voluntary reports)." },
   { h: "How we use data", p: "Data is used to personalise your learning path, calculate XP/streaks, deliver premium features, and improve app quality. We never sell your personal data." },
-  { h: "Voice interactions", p: "Voice sessions with other learners are peer-to-peer and are not recorded by the Lingua Franca servers. Only metadata (duration, timestamp) is stored." },
+  { h: "Voice interactions", p: "Voice sessions with other learners are peer-to-peer and are not recorded by the Acuspeak servers. Only metadata (duration, timestamp) is stored." },
   { h: "Third parties", p: "We use Google for authentication and Stripe for payments. Both are subject to their own privacy policies." },
   { h: "Your rights", p: "You may request deletion of your account at any time by contacting support. On deletion, personal identifiers are permanently removed within 30 days." },
-  { h: "Contact", p: "Questions? Email privacy@linguafranca.app." },
+  { h: "Contact", p: "Questions? Email privacy@acuspeak.app." },
 ];
 
 export default function Privacy() {

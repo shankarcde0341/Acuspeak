@@ -8,7 +8,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 
 import { api } from "@/src/api/client";
 import { colors, gradients, radii, shadow, typography } from "@/src/theme";
-import { GlassCard, SectionTitle } from "@/src/components/ui";
+import { Avatar, GlassCard, SectionTitle } from "@/src/components/ui";
 
 export default function Live() {
   const router = useRouter();
@@ -54,7 +54,7 @@ export default function Live() {
                   <TouchableOpacity onPress={() => router.push({ pathname: "/room/[id]", params: { id: r.room_id, title: r.title, topic: r.topic, host: r.host_name, avatar: r.host_avatar } })} activeOpacity={0.9} testID={`live-room-${r.room_id}`}>
                     <GlassCard>
                       <View style={{ flexDirection: "row" }}>
-                        <Image source={{ uri: r.host_avatar }} style={styles.hostAvatar} />
+                        <Avatar uri={r.host_avatar} name={r.host_name} size={52} isPremium={Boolean(r.is_premium)} />
                         <View style={{ flex: 1, marginLeft: 12 }}>
                           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                             <View style={styles.liveDot} />

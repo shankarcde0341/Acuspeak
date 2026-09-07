@@ -6,13 +6,15 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { api } from "@/src/api/client";
+import { useAuth } from "@/src/context/AuthContext";
 import { colors, gradients, radii, shadow, typography } from "@/src/theme";
-import { ScreenHeader } from "@/src/components/ui";
+import { Avatar, ProTag, ScreenHeader } from "@/src/components/ui";
 
 const MEDAL: Record<number, string> = { 0: "#F59E0B", 1: "#94A3B8", 2: "#B45309" };
 
 export default function Leaderboard() {
   const router = useRouter();
+  const { user: myUser } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [me, setMe] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,9 +76,9 @@ export default function Leaderboard() {
             ) : (
               <>
                 <View style={styles.podium}>
-                  <PodiumCard user={normalizedRows[1]} rank={2} height={100} scoreKey={scoreKey} />
-                  <PodiumCard user={normalizedRows[0]} rank={1} height={140} scoreKey={scoreKey} />
-                  <PodiumCard user={normalizedRows[2]} rank={3} height={80} scoreKey={scoreKey} />
+                  <PodiumCard user={normalizedRows[1]} rank={2} height={100} scoreKey={scoreKey} myUser={myUser} me={me} />
+                  <PodiumCard user={normalizedRows[0]} rank={1} height={140} scoreKey={scoreKey} myUser={myUser} me={me} />
+                  <PodiumCard user={normalizedRows[2]} rank={3} height={80} scoreKey={scoreKey} myUser={myUser} me={me} />
                 </View>
 
                 <View style={styles.summaryCard}>
@@ -90,18 +92,16 @@ export default function Leaderboard() {
                 {normalizedRows.slice(3).map((u, i) => {
                   const rank = i + 4;
                   const mine = u.user_id === me;
+                  const isUserPremium = mine ? Boolean(myUser?.is_premium) : Boolean(u.is_premium);
                   return (
                     <View key={u.user_id} style={[styles.row, mine && styles.rowMe]}>
                       <Text style={styles.rank}>#{rank}</Text>
-                      {u.picture ? (
-                        <Image source={{ uri: u.picture }} style={styles.avatar} />
-                      ) : (
-                        <View style={[styles.avatar, styles.avatarFallback]}>
-                          <Text style={styles.avatarInit}>{u.name.charAt(0)}</Text>
-                        </View>
-                      )}
+                      <Avatar uri={u.picture} name={u.name} size={42} isPremium={isUserPremium} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.name}>{u.name}</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Text style={styles.name}>{u.name}</Text>
+                          {isUserPremium ? <ProTag size="sm" /> : null}
+                        </View>
                         <View style={styles.metaRow}>
                           <Ionicons name="flame" size={12} color="#F59E0B" />
                           <Text style={styles.streak}>{u.streak || 0} day streak</Text>
@@ -123,18 +123,16 @@ export default function Leaderboard() {
   );
 }
 
-function PodiumCard({ user, rank, height, scoreKey }: { user: any; rank: number; height: number; scoreKey: string }) {
+function PodiumCard({ user, rank, height, scoreKey, myUser, me }: { user: any; rank: number; height: number; scoreKey: string; myUser: any; me: string | null }) {
   if (!user) return <View style={{ flex: 1, alignItems: "center" }} />;
+  const isUserPremium = user.user_id === me ? Boolean(myUser?.is_premium) : Boolean(user.is_premium);
   return (
     <View style={{ flex: 1, alignItems: "center" }}>
-      {user.picture ? (
-        <Image source={{ uri: user.picture }} style={styles.podiumAvatar} />
-      ) : (
-        <View style={[styles.podiumAvatar, styles.avatarFallback]}>
-          <Text style={styles.avatarInit}>{user.name.charAt(0)}</Text>
-        </View>
-      )}
-      <Text style={styles.podiumName} numberOfLines={1}>{user.name}</Text>
+      <Avatar uri={user.picture} name={user.name} size={64} isPremium={isUserPremium} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8, justifyContent: "center" }}>
+        <Text style={styles.podiumName} numberOfLines={1}>{user.name}</Text>
+        {isUserPremium ? <ProTag size="sm" /> : null}
+      </View>
       <Text style={styles.podiumXp}>{user[scoreKey]} {scoreKey === "weekly_xp" ? "XP" : "XP"}</Text>
       <View style={[styles.podiumBar, { height, backgroundColor: MEDAL[rank - 1] }]}>  
         <Text style={styles.podiumRank}>#{rank}</Text>

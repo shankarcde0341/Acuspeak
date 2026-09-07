@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, ImageBackground } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
@@ -29,17 +29,31 @@ export default function LessonList() {
   const [completed, setCompleted] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [cats, ls, prog] = await Promise.all([api.lessonCategories(), api.lessons(categoryId as string), api.lessonProgress()]);
-        setCategory((cats.categories || []).find((c: any) => c.id === categoryId));
-        setLessons(ls.lessons || []);
-        setCompleted(prog.completed_ids || []);
-      } catch { /* ignore */ }
-      setLoading(false);
-    })();
-  }, [categoryId]);
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      (async () => {
+        try {
+          const [cats, ls, prog] = await Promise.all([
+            api.lessonCategories(),
+            api.lessons(categoryId as string),
+            api.lessonProgress(),
+          ]);
+          if (isMounted) {
+            setCategory((cats.categories || []).find((c: any) => c.id === categoryId));
+            setLessons(ls.lessons || []);
+            setCompleted(prog.completed_ids || []);
+          }
+        } catch {
+          /* ignore */
+        }
+        if (isMounted) setLoading(false);
+      })();
+      return () => {
+        isMounted = false;
+      };
+    }, [categoryId])
+  );
 
   return (
     <View style={styles.root} testID="lesson-list-screen">

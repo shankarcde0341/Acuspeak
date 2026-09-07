@@ -7,6 +7,9 @@ import Svg, { Circle } from "react-native-svg";
 import { useRouter } from "expo-router";
 import { colors, gradients, radii, shadow, typography } from "@/src/theme";
 
+export { Avatar } from "./ui/Avatar";
+export { ProTag } from "./ui/ProTag";
+
 // Glass Card
 export function GlassCard({ children, style, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; testID?: string }) {
   return (
@@ -30,11 +33,11 @@ const glassStyles = StyleSheet.create({
 
 // Primary gradient button
 export function GradientButton({
-  label, onPress, icon, style, textStyle, testID, disabled,
-}: { label: string; onPress: () => void; icon?: keyof typeof Ionicons.glyphMap; style?: StyleProp<ViewStyle>; textStyle?: StyleProp<TextStyle>; testID?: string; disabled?: boolean }) {
+  label, onPress, icon, style, textStyle, testID, disabled, colors: buttonColors,
+}: { label: string; onPress: () => void; icon?: keyof typeof Ionicons.glyphMap; style?: StyleProp<ViewStyle>; textStyle?: StyleProp<TextStyle>; testID?: string; disabled?: boolean; colors?: readonly [string, string, ...string[]] }) {
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} disabled={disabled} testID={testID} style={style}>
-      <LinearGradient colors={disabled ? ["#CBD5E1", "#94A3B8"] : gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={btnStyles.gbtn}>
+      <LinearGradient colors={disabled ? ["#CBD5E1", "#94A3B8"] : (buttonColors || gradients.primary)} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={btnStyles.gbtn}>
         <Text style={[btnStyles.gtext, textStyle]}>{label}</Text>
         {icon ? <Ionicons name={icon} size={18} color="#fff" /> : null}
       </LinearGradient>

@@ -19,6 +19,9 @@ export const colors = {
   danger: "#DC2626",
   chipBg: "rgba(59,130,246,0.10)",
   chipActive: "#1E3A8A",
+  premiumOrange: "#FF7A00",
+  premiumOrangeLight: "rgba(255,122,0,0.12)",
+  premiumOrangeDark: "#C2410C",
 };
 
 export const gradients = {
@@ -27,6 +30,8 @@ export const gradients = {
   gold: ["#FBBF24", "#F59E0B"] as const,
   dark: ["#0B1338", "#1E3A8A"] as const,
   premium: ["#0F172A", "#1E3A8A", "#312E81"] as const,
+  premiumOrange: ["#FF8A3D", "#FF5500"] as const,
+  premiumOrangeSoft: ["#FFEDD5", "#FFF3EB"] as const,
 };
 
 export const radii = {

@@ -13,7 +13,7 @@ import { colors, gradients, radii, shadow, typography } from "@/src/theme";
 export default function Call() {
   const { name, avatar, gender, country, room_id: roomIdParam } = useLocalSearchParams<{ name: string; avatar: string; gender: string; country: string; room_id?: string }>();
   const router = useRouter();
-  const { refresh } = useAuth();
+  const { refresh, updateUser } = useAuth();
   const [seconds, setSeconds] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState(true);
@@ -204,7 +204,8 @@ export default function Call() {
     if (timer.current) clearInterval(timer.current);
     await teardownZego();
     try {
-      await api.logCall({ partner_name: String(name || ""), partner_avatar: String(avatar || ""), duration_seconds: seconds, partner_gender: String(gender || "any") });
+      const res = await api.logCall({ partner_name: String(name || ""), partner_avatar: String(avatar || ""), duration_seconds: seconds, partner_gender: String(gender || "any") });
+      if (res?.user) updateUser(res.user);
       await refresh();
     } catch { /* ignore */ }
     router.replace("/(tabs)");

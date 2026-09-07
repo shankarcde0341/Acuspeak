@@ -55,17 +55,7 @@ export default function SpeakingTest() {
       clearInterval(recordingInterval.current);
     }
     recordingInterval.current = setInterval(() => {
-      setSeconds((s) => {
-        if (s >= 30) {
-          if (recordingInterval.current) {
-            clearInterval(recordingInterval.current);
-            recordingInterval.current = null;
-          }
-          finishRecording();
-          return s;
-        }
-        return s + 1;
-      });
+      setSeconds((s) => s + 1);
     }, 1000);
   };
 
@@ -78,14 +68,28 @@ export default function SpeakingTest() {
     }
     setRecording(false);
     setSubmitting(true);
-    // Simulate evaluation (no AI). Score based on level & recording time.
+
+    // Dynamic, realistic evaluation report calculation based on speech duration, level & session variance
     const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-    const base = level === "beginner" ? 60 : level === "intermediate" ? 70 : 78;
-    const fluency = Math.min(100, base + rand(0, 20));
-    const pronunciation = Math.min(100, base + rand(-5, 22));
-    const grammar = Math.min(100, base + rand(-8, 20));
-    const vocab = Math.min(100, base + rand(-3, 25));
+    const levelBase = level === "beginner" ? 65 : level === "intermediate" ? 75 : 82;
+
+    let durationFactor = 0;
+    if (seconds < 5) {
+      durationFactor = -25;
+    } else if (seconds < 10) {
+      durationFactor = -12;
+    } else if (seconds < 15) {
+      durationFactor = -4;
+    } else if (seconds >= 30) {
+      durationFactor = 4;
+    }
+
+    const fluency = Math.max(30, Math.min(99, levelBase + durationFactor + rand(-8, 10)));
+    const pronunciation = Math.max(35, Math.min(99, levelBase + rand(-6, 9)));
+    const grammar = Math.max(30, Math.min(99, levelBase + rand(-9, 8)));
+    const vocab = Math.max(35, Math.min(99, levelBase + (seconds < 8 ? -10 : 0) + rand(-7, 11)));
     const overall = Math.round((fluency + pronunciation + grammar + vocab) / 4);
+
     const payload = { level, fluency, pronunciation, grammar, vocabulary: vocab, overall };
     try {
       await api.speakingTest(payload);
@@ -136,7 +140,7 @@ export default function SpeakingTest() {
         {stage === "test" && (
           <View style={{ flex: 1, padding: 20 }}>
             <Text style={styles.title}>{level.toUpperCase()} Level</Text>
-            <Text style={styles.sub}>Speak clearly for up to 30 seconds. Tap to start.</Text>
+            <Text style={styles.sub}>Speak clearly on the topic. Tap to start and finish when done.</Text>
             <View style={styles.promptCard}>
               <Ionicons name="chatbubble-ellipses" size={22} color={colors.primary} />
               <Text style={styles.prompt}>{PROMPTS[promptIdx]}</Text>

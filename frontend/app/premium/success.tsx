@@ -44,17 +44,17 @@ export default function PremiumSuccess() {
         )}
         {status === "success" && (
           <>
-            <View style={styles.iconOk}><Ionicons name="checkmark-circle" size={72} color="#10B981" /></View>
+            <View style={styles.iconOk}><Ionicons name="star" size={64} color="#FFFFFF" /></View>
             <Text style={styles.title}>You&apos;re Premium!</Text>
             <Text style={styles.sub}>All Premium features are now unlocked on your account.</Text>
             <View style={{ marginTop: 30, width: "100%" }}>
-              <GradientButton label="Start using Premium" icon="rocket" onPress={() => router.replace("/(tabs)")} testID="premium-success-continue" />
+              <GradientButton label="Start using Premium" icon="rocket" colors={gradients.premiumOrange} onPress={() => router.replace("/(tabs)")} testID="premium-success-continue" />
             </View>
           </>
         )}
         {status === "failed" && (
           <>
-            <View style={styles.iconOk}><Ionicons name="close-circle" size={72} color="#EF4444" /></View>
+            <View style={[styles.iconOk, { backgroundColor: "rgba(239,68,68,0.18)" }]}><Ionicons name="close-circle" size={64} color="#EF4444" /></View>
             <Text style={styles.title}>Payment not completed</Text>
             <Text style={styles.sub}>Please try again or contact support.</Text>
             <View style={{ marginTop: 30, width: "100%" }}>
@@ -71,5 +71,5 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   title: { ...typography.h1, color: "#fff", textAlign: "center", marginTop: 26, fontSize: 26 },
   sub: { ...typography.body, color: "rgba(255,255,255,0.75)", textAlign: "center", marginTop: 8 },
-  iconOk: { padding: 16, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.1)", ...shadow.strong },
+  iconOk: { width: 96, height: 96, borderRadius: 999, backgroundColor: colors.premiumOrange, alignItems: "center", justifyContent: "center", ...shadow.strong },
 });

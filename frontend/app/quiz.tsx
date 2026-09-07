@@ -13,7 +13,7 @@ import { ScreenHeader, GradientButton, ProgressRing } from "@/src/components/ui"
 
 export default function Quiz() {
   const router = useRouter();
-  const { refresh } = useAuth();
+  const { refresh, updateUser } = useAuth();
   const [questions, setQuestions] = useState<any[]>([]);
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
@@ -43,8 +43,10 @@ export default function Quiz() {
     } else {
       setSubmitting(true);
       try {
-        const xp = correct * 10 + (correct === questions.length ? 20 : 0);
-        await api.addXp(xp, "quiz-completed", 1);
+        const xp = 5;
+        const res = await api.addXp(xp, "quiz-set-completed", 0);
+        if (res && res.user_id) updateUser(res);
+        try { await api.completeChallenge("c3"); } catch { /* ignore */ }
         await refresh();
       } catch { /* ignore */ }
       setSubmitting(false);
@@ -66,10 +68,25 @@ export default function Quiz() {
               <ProgressRing size={160} stroke={12} progress={scorePct} color={colors.primaryLight}>
                 <Text style={styles.finalScore}>{Math.round(scorePct * 100)}%</Text>
               </ProgressRing>
-              <Text style={styles.finishedTitle}>Quiz Complete!</Text>
+              <Text style={styles.finishedTitle}>Quiz Set Complete!</Text>
               <Text style={styles.finishedSub}>You got {correct} out of {questions.length} correct.</Text>
-              <View style={{ marginTop: 30, width: "100%" }}>
-                <GradientButton label="Back to Practice" icon="arrow-back" onPress={() => router.replace("/(tabs)/practice")} testID="quiz-back-btn" />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#DBEAFE", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, marginTop: 14 }}>
+                <Ionicons name="flash" size={16} color="#1E3A8A" />
+                <Text style={{ fontFamily: "Manrope_700Bold", color: "#1E3A8A", fontSize: 14 }}>+5 XP earned!</Text>
+              </View>
+              <View style={{ marginTop: 30, width: "100%", gap: 12 }}>
+                <GradientButton label="Take another 5-question quiz" icon="reload" onPress={async () => {
+                  setQuestions([]);
+                  setFinished(false);
+                  setIdx(0);
+                  setSelected(null);
+                  setCorrect(0);
+                  setAnswered(false);
+                  try { const d = await api.quiz(); setQuestions(d.questions || []); } catch { /* ignore */ }
+                }} testID="quiz-again-btn" />
+                <TouchableOpacity onPress={() => router.replace("/(tabs)/practice")} style={{ paddingVertical: 12, alignItems: "center" }} testID="quiz-back-btn">
+                  <Text style={{ fontFamily: "Manrope_600SemiBold", color: colors.textSecondary }}>Back to Practice</Text>
+                </TouchableOpacity>
               </View>
             </View>
           ) : (

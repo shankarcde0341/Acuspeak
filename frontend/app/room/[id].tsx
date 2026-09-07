@@ -9,7 +9,7 @@ import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, wit
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, gradients, radii, shadow, typography } from "@/src/theme";
-import { ScreenHeader } from "@/src/components/ui";
+import { Avatar, ScreenHeader } from "@/src/components/ui";
 
 const FAKE_LISTENERS = [
   { name: "Aisha", avatar: "https://i.pravatar.cc/150?img=48" },
@@ -53,7 +53,7 @@ export default function Room() {
           <View style={styles.speakers}>
             <Animated.View style={[styles.speakerRing, speakerPulse]} />
             <View style={styles.speaker}>
-              <Image source={{ uri: String(avatar || "") }} style={styles.speakerAvatar} />
+              <Avatar uri={String(avatar || "")} name={String(host || "")} size={100} isPremium={false} />
               <Text style={styles.speakerName}>{host}</Text>
               <View style={styles.hostChip}><Text style={styles.hostChipText}>HOST</Text></View>
             </View>
@@ -63,13 +63,13 @@ export default function Room() {
           <View style={styles.listeners}>
             {FAKE_LISTENERS.map((l, i) => (
               <Animated.View key={i} entering={FadeInDown.delay(60 + i * 40).duration(400)} style={{ alignItems: "center", width: "22%" }}>
-                <Image source={{ uri: l.avatar }} style={styles.listenerAvatar} />
+                <Avatar uri={l.avatar} name={l.name} size={60} isPremium={false} />
                 <Text style={styles.listenerName} numberOfLines={1}>{l.name}</Text>
               </Animated.View>
             ))}
             {user ? (
               <Animated.View entering={FadeInDown.delay(320).duration(400)} style={{ alignItems: "center", width: "22%" }}>
-                {user.picture ? <Image source={{ uri: user.picture }} style={styles.listenerAvatar} /> : <View style={[styles.listenerAvatar, styles.listenerFallback]}><Text style={{ color: "#fff", fontFamily: "Outfit_700Bold" }}>{user.name.charAt(0)}</Text></View>}
+                <Avatar uri={user.picture} name={user.name} size={60} isPremium={user.is_premium} />
                 <Text style={styles.listenerName} numberOfLines={1}>You</Text>
               </Animated.View>
             ) : null}

@@ -1,0 +1,23 @@
+# Heavy local native folders
+android/
+ios/
+
+# Dependencies & caches
+node_modules/
+.expo/
+npm-debug.*
+yarn-error.log
+
+# Exclude heavy lesson audio from dev client APK
+assets/audio/
+
+
+# Backend or root level leaks (if any)
+backend/
+venv/
+*.pyc
+__pycache__/
+
+# Unnecessary build artifacts
+build/
+dist/

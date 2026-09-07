@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { api } from "@/src/api/client";
 import { colors, radii, shadow, typography } from "@/src/theme";
-import { ScreenHeader } from "@/src/components/ui";
+import { Avatar, ScreenHeader } from "@/src/components/ui";
 
 export default function Friends() {
   const router = useRouter();
@@ -37,7 +37,7 @@ export default function Friends() {
               contentContainerStyle={{ padding: 20, paddingBottom: 160 }}
               renderItem={({ item }) => (
                 <View style={styles.row} testID={`friend-req-${item.request_id}`}>
-                  <Image source={{ uri: item.to_avatar }} style={styles.avatar} />
+                  <Avatar uri={item.to_avatar} name={item.to_name} size={46} isPremium={Boolean(item.is_premium)} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.name}>{item.to_name}</Text>
                     <Text style={styles.meta}>Request sent · {new Date(item.created_at).toLocaleDateString()}</Text>

@@ -15,12 +15,13 @@ type Mode = "all" | "saved";
 
 export default function Vocabulary() {
   const router = useRouter();
-  const { user, refresh } = useAuth();
+  const { user, refresh, updateUser } = useAuth();
   const [words, setWords] = useState<any[]>([]);
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [mode, setMode] = useState<Mode>("all");
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
   const flip = useSharedValue(0);
 
   useEffect(() => {
@@ -51,8 +52,15 @@ export default function Vocabulary() {
   const toggleSave = async () => {
     if (!current) return;
     try {
-      if (isSaved) await api.unsaveWord(current.id);
-      else await api.saveWord(current.id);
+      if (isSaved) {
+        const res = await api.unsaveWord(current.id);
+        if (res && res.user_id) updateUser(res);
+      } else {
+        const res = await api.saveWord(current.id);
+        if (res && res.user_id) updateUser(res);
+        setToast("+2 XP earned!");
+        setTimeout(() => setToast(null), 2200);
+      }
       await refresh();
     } catch { /* ignore */ }
   };
@@ -126,12 +134,20 @@ export default function Vocabulary() {
           )}
         </ScrollView>
       </SafeAreaView>
+      {toast ? (
+        <View style={styles.toast} testID="vocab-toast">
+          <Ionicons name="flash" size={16} color="#fff" />
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  toast: { position: "absolute", bottom: 40, left: 20, right: 20, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 999, ...shadow.strong },
+  toastText: { color: "#fff", fontFamily: "Manrope_700Bold" },
   tabsRow: { flexDirection: "row", backgroundColor: "#E2E8F0", padding: 4, borderRadius: 999, alignSelf: "center", gap: 4 },
   modeTab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999 },
   modeTabActive: { backgroundColor: "#fff", ...shadow.soft },

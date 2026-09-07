@@ -3,14 +3,14 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshCon
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import * as Speech from "expo-speech";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { api } from "@/src/api/client";
 import { colors, gradients, radii, shadow, typography } from "@/src/theme";
-import { GlassCard, GradientButton, ProgressRing, SectionTitle } from "@/src/components/ui";
+import { Avatar, GlassCard, GradientButton, ProgressRing, ProTag, SectionTitle } from "@/src/components/ui";
 
 const CAT_IMAGES: Record<string, string> = {
   daily: "https://images.pexels.com/photos/8199231/pexels-photo-8199231.jpeg",
@@ -32,7 +32,23 @@ export default function Home() {
   const load = useCallback(async () => {
     try { const d = await api.home(); setData(d); } catch { /* ignore */ }
   }, []);
+
   useEffect(() => { load(); }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      refresh();
+    }, [load, refresh])
+  );
+
+  useEffect(() => {
+    if (user && data) {
+      if (data.xp !== user.xp || data.streak !== user.streak || data.daily_goal_completed_minutes !== user.daily_goal_completed_minutes) {
+        setData((prev: any) => (prev ? { ...prev, xp: user.xp, streak: user.streak, daily_goal_completed_minutes: user.daily_goal_completed_minutes } : prev));
+      }
+    }
+  }, [user, data]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -44,7 +60,11 @@ export default function Home() {
     return <View style={{ flex: 1, backgroundColor: colors.bg }} testID="home-loading" />;
   }
 
-  const goalProgress = Math.min(1, (data.daily_goal_completed_minutes || 0) / (data.daily_goal_minutes || 15));
+  const currentXp = user?.xp ?? data.xp ?? 0;
+  const currentStreak = user?.streak ?? data.streak ?? 0;
+  const completedMins = user?.daily_goal_completed_minutes ?? data.daily_goal_completed_minutes ?? 0;
+  const totalGoalMins = user?.daily_goal_minutes ?? data.daily_goal_minutes ?? 15;
+  const goalProgress = Math.min(1, completedMins / (totalGoalMins || 15));
 
   return (
     <View style={styles.root} testID="home-screen">
@@ -58,18 +78,15 @@ export default function Home() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.hi}>Hey, {data.welcome_name} 👋</Text>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <Text style={styles.hi}>Hey, {data.welcome_name} 👋</Text>
+                {user.is_premium ? <ProTag size="md" /> : null}
+              </View>
               <Text style={styles.subHi}>{data.quote}</Text>
             </View>
             <TouchableOpacity onPress={() => router.push("/(tabs)/profile")} testID="home-avatar">
-              {user.picture ? (
-                <Image source={{ uri: user.picture }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarFallback]}>
-                  <Text style={styles.avatarText}>{data.welcome_name.charAt(0).toUpperCase()}</Text>
-                </View>
-              )}
+              <Avatar uri={user.picture} name={data.welcome_name} size={48} isPremium={user.is_premium} />
             </TouchableOpacity>
           </View>
 
@@ -77,15 +94,15 @@ export default function Home() {
           <Animated.View entering={FadeInDown.duration(400)} style={styles.stripRow}>
             <View style={[styles.chip, { backgroundColor: "#FEF3C7" }]}>
               <Ionicons name="flame" size={16} color="#F59E0B" />
-              <Text style={styles.chipText}>{data.streak} day streak</Text>
+              <Text style={styles.chipText}>{currentStreak} day streak</Text>
             </View>
             <View style={[styles.chip, { backgroundColor: "#DBEAFE" }]}>
               <Ionicons name="flash" size={16} color="#2563EB" />
-              <Text style={[styles.chipText, { color: "#1E3A8A" }]}>{data.xp} XP</Text>
+              <Text style={[styles.chipText, { color: "#1E3A8A" }]}>{currentXp} XP</Text>
             </View>
             <View style={[styles.chip, { backgroundColor: "#D1FAE5" }]}>
               <Ionicons name="hourglass" size={14} color="#059669" />
-              <Text style={[styles.chipText, { color: "#065F46" }]}>{Math.max(0, data.daily_goal_minutes - data.daily_goal_completed_minutes)} min left</Text>
+              <Text style={[styles.chipText, { color: "#065F46" }]}>{Math.max(0, totalGoalMins - completedMins)} min left</Text>
             </View>
           </Animated.View>
 
@@ -112,10 +129,10 @@ export default function Home() {
           {/* Word of the day */}
           <Animated.View entering={FadeInDown.delay(140).duration(400)} style={{ marginTop: 18 }}>
             <SectionTitle title="Word of the day" action="See all" onAction={() => router.push("/vocabulary")} />
-            <GlassCard testID="home-word-of-day">
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <LinearGradient colors={["#3B82F6", "#0EA5E9"] as const} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wodCard} testID="home-word-of-day">
+              <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Text style={styles.wodWord}>{data.word_of_the_day.word}</Text>
                     <TouchableOpacity
                       onPress={() => Speech.speak(data.word_of_the_day.word, { language: "en-US", rate: 0.85 })}
@@ -123,18 +140,26 @@ export default function Home() {
                       testID="home-word-speaker-btn"
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="volume-high" size={16} color={colors.primary} />
+                      <Ionicons name="volume-high" size={16} color="#fff" />
                     </TouchableOpacity>
+                    {data.word_of_the_day.phonetic ? (
+                      <View style={styles.phoneticBadge}>
+                        <Text style={styles.wodPhonetic}>{data.word_of_the_day.phonetic}</Text>
+                      </View>
+                    ) : null}
                   </View>
-                  <Text style={styles.wodPhonetic}>{data.word_of_the_day.phonetic}</Text>
                   <Text style={styles.wodMeaning}>{data.word_of_the_day.meaning}</Text>
-                  <Text style={styles.wodExample}>&quot;{data.word_of_the_day.example}&quot;</Text>
+                  {data.word_of_the_day.example ? (
+                    <View style={styles.exampleBox}>
+                      <Text style={styles.wodExample}>&quot;{data.word_of_the_day.example}&quot;</Text>
+                    </View>
+                  ) : null}
                 </View>
-                <TouchableOpacity style={styles.wodBtn} onPress={() => router.push("/vocabulary")} testID="home-word-flashcards">
-                  <Ionicons name="albums" size={22} color={colors.primary} />
+                <TouchableOpacity style={styles.wodBtn} onPress={() => router.push("/vocabulary")} testID="home-word-flashcards" activeOpacity={0.9}>
+                  <Ionicons name="albums" size={20} color={colors.primary} />
                 </TouchableOpacity>
               </View>
-            </GlassCard>
+            </LinearGradient>
           </Animated.View>
 
           {/* Speak with Real People */}
@@ -178,8 +203,25 @@ export default function Home() {
           <Animated.View entering={FadeInDown.delay(320).duration(400)} style={{ marginTop: 22 }}>
             <SectionTitle title="Daily Challenges" action="View all" onAction={() => router.push("/challenges")} />
             <View style={{ gap: 12 }}>
-              {data.challenges.slice(0, 3).map((c: any) => (
-                <TouchableOpacity key={c.id} onPress={() => router.push("/challenges")} activeOpacity={0.9} testID={`home-challenge-${c.id}`}>
+              {data.challenges.slice(0, 3).map((c: any, index: number) => (
+                <TouchableOpacity
+                  key={c.id}
+                  onPress={() => {
+                    if (c.id === "c3" || c.type === "quiz" || c.title?.toLowerCase().includes("quiz")) {
+                      router.push("/quiz");
+                    } else if (c.id === "c2" || c.type === "vocab" || c.title?.toLowerCase().includes("words")) {
+                      router.push("/vocabulary");
+                    } else if (index === 0 || c.type === "speak" || c.id === "c1") {
+                      router.push("/match");
+                    } else if (c.type === "lesson") {
+                      router.push("/lessons/daily");
+                    } else {
+                      router.push("/challenges");
+                    }
+                  }}
+                  activeOpacity={0.9}
+                  testID={`home-challenge-${c.id}`}
+                >
                   <GlassCard>
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                       <View style={styles.challengeIcon}>
@@ -241,12 +283,19 @@ const styles = StyleSheet.create({
   goalCtaText: { ...typography.body, color: colors.primary, fontFamily: "Outfit_600SemiBold" },
   ringText: { color: "#fff", fontFamily: "Outfit_700Bold", fontSize: 20 },
 
-  wodWord: { ...typography.h2, fontSize: 22 },
-  wodSpeaker: { width: 32, height: 32, borderRadius: 999, backgroundColor: "#DBEAFE", alignItems: "center", justifyContent: "center" },
-  wodPhonetic: { ...typography.small, color: colors.primary, marginTop: 2 },
-  wodMeaning: { ...typography.body, marginTop: 8 },
-  wodExample: { ...typography.small, color: colors.textSecondary, marginTop: 6, fontStyle: "italic" },
-  wodBtn: { width: 46, height: 46, borderRadius: 999, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", ...shadow.soft },
+  wodCard: {
+    padding: 11,
+    borderRadius: radii.xl,
+    ...shadow.strong,
+  },
+  wodWord: { fontFamily: "Outfit_800ExtraBold", fontSize: 24, color: "#FFFFFF" },
+  wodSpeaker: { width: 34, height: 34, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.20)", alignItems: "center", justifyContent: "center" },
+  phoneticBadge: { backgroundColor: "rgba(255,255,255,0.20)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: radii.pill },
+  wodPhonetic: { fontFamily: "Manrope_600SemiBold", fontSize: 12, color: "#FFFFFF" },
+  wodMeaning: { ...typography.body, fontFamily: "Manrope_600SemiBold", color: "rgba(255,255,255,0.95)", marginTop: 10, lineHeight: 22 },
+  exampleBox: { marginTop: 12, padding: 12, borderRadius: radii.md, backgroundColor: "rgba(255,255,255,0.15)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderLeftWidth: 3, borderLeftColor: "#38BDF8" },
+  wodExample: { ...typography.small, color: "rgba(255,255,255,0.90)", fontStyle: "italic", lineHeight: 20 },
+  wodBtn: { width: 48, height: 48, borderRadius: radii.lg, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", ...shadow.soft },
 
   quickWide: { flexDirection: "row", alignItems: "center", gap: 14, padding: 20, borderRadius: radii.xl, ...shadow.strong },
   quickTag: { color: "rgba(255,255,255,0.8)", fontFamily: "Manrope_700Bold", fontSize: 10, letterSpacing: 1.4 },

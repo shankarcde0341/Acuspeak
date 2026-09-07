@@ -27,15 +27,15 @@ const TIERS: Array<{
   price: string;
   per: string;
   tagline: string;
-  backendPlan: "weekly" | "monthly" | "quarterly" | "yearly" | null;   // null = no checkout (Free)
+  backendPlan: "weekly" | "monthly" | "quarterly" | null;   // null = no checkout (Free)
   highlight?: boolean;
   ribbon?: string;
 }> = [
-  { id: "free",    label: "Free",       price: "₹0",   per: "forever",     tagline: "Start learning today",     backendPlan: null },
-  { id: "pack49",  label: "₹49 Pack",   price: "₹49",  per: "/ week",     tagline: "Trail pack + Ad-free + daily practice", backendPlan: "weekly", highlight: true },
-  { id: "pack199", label: "₹199 Pack",  price: "₹199", per: "/ monthly",   tagline: "Unlimited social + certs", backendPlan: "monthly", highlight: true, ribbon: "MOST POPULAR" },
-  { id: "pack499", label: "₹499 Pack",  price: "₹499", per: "/ quarterly",      tagline: "Everything unlocked",       backendPlan: "quarterly",  highlight: true, ribbon: "BEST VALUE" },
-];
+    { id: "free", label: "Free", price: "₹0", per: "forever", tagline: "Start learning today", backendPlan: null },
+    { id: "pack49", label: "₹49 Pack", price: "₹49", per: "/ week", tagline: "Trail pack + Ad-free + daily practice", backendPlan: "weekly", highlight: true },
+    { id: "pack199", label: "₹199 Pack", price: "₹199", per: "/ monthly", tagline: "Unlimited social + certs", backendPlan: "monthly", highlight: true, ribbon: "MOST POPULAR" },
+    { id: "pack499", label: "₹499 Pack", price: "₹499", per: "/ quarterly", tagline: "Everything unlocked", backendPlan: "quarterly", highlight: true, ribbon: "BEST VALUE" },
+  ];
 
 type Cell = { kind: "yes" } | { kind: "no" } | { kind: "text"; text: string };
 const YES: Cell = { kind: "yes" };
@@ -43,16 +43,16 @@ const NO: Cell = { kind: "no" };
 const T = (text: string): Cell => ({ kind: "text", text });
 
 const COMPARISON: Array<{ feature: string; cells: [Cell, Cell, Cell, Cell] }> = [
-  { feature: "Ad-Free Experience",  cells: [NO, YES, YES, YES] },
-  { feature: "Speaking Partner",    cells: [NO, T("15 min/day"), T("30 min/day"), T("30 min/day")] },
-  { feature: "Gender Filter",       cells: [NO, NO, NO, YES] },
-  { feature: "Social Feature",      cells: [NO, T("Limited"), T("Unlimited"), T("Unlimited")] },
-  { feature: "Daily Quiz",          cells: [T("5/day"), T("10/day"), T("20/day"), T("20/day")] },
-  { feature: "Daily Lesson",      cells: [NO, YES, YES, YES] },
-  { feature: "Streak Reward",       cells: [YES, YES, YES, YES] },
-  { feature: "Courses",             cells: [NO, YES, YES, YES] },
-  { feature: "Live Room",           cells: [NO, T("Limited"), T("Limited"), YES] },
-  { feature: "Certificates",        cells: [NO, NO, YES, YES] },
+  { feature: "Ad-Free Experience", cells: [NO, YES, YES, YES] },
+  { feature: "Speaking Partner", cells: [NO, T("15 min/day"), T("30 min/day"), T("30 min/day")] },
+  { feature: "Gender Filter", cells: [NO, NO, NO, YES] },
+  { feature: "Social Feature", cells: [NO, T("Limited"), T("Unlimited"), T("Unlimited")] },
+  { feature: "Daily Quiz", cells: [T("5/day"), T("10/day"), T("20/day"), T("20/day")] },
+  { feature: "Daily Lesson", cells: [NO, YES, YES, YES] },
+  { feature: "Streak Reward", cells: [YES, YES, YES, YES] },
+  { feature: "Courses", cells: [NO, YES, YES, YES] },
+  { feature: "Live Room", cells: [NO, T("Limited"), T("Limited"), YES] },
+  { feature: "Certificates", cells: [NO, NO, YES, YES] },
 ];
 
 export default function Premium() {
@@ -66,11 +66,6 @@ export default function Premium() {
     (async () => { try { await api.subscriptionPlans(); } catch { /* ignore */ } })();
   }, []);
 
-  /**
-   * Resolves the origin URL for subscription checkout redirection callbacks.
-   * Returns window.location.origin on Web platform, or the dynamic backend URL on Native platforms.
-   * @returns {string} Origin base URL string.
-   */
   const originUrl = () => {
     if (Platform.OS === "web" && typeof window !== "undefined") return window.location.origin;
     return getBackendUrl();

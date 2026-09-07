@@ -194,6 +194,8 @@ export const api = {
   createCheckout: (plan: string, origin_url: string) => request<any>("/subscription/checkout", { method: "POST", body: JSON.stringify({ plan, origin_url }) }),
   /** Polls subscription checkout session payment status */
   pollCheckout: (session_id: string) => request<any>(`/subscription/status/${session_id}`),
+  /** Cancels active user subscription */
+  cancelSubscription: () => request<any>("/subscription/cancel", { method: "POST" }),
   /** Fetches ZegoCloud RTC authentication token for voice call room */
   getZegoToken: (room_id: string) => request<any>("/zego/token", { method: "POST", body: JSON.stringify({ room_id }) }),
 };

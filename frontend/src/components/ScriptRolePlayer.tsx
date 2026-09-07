@@ -828,7 +828,16 @@ export function ScriptRolePlayer({ script, lessonId, onBack, onComplete }: Scrip
     if (onBack) {
       onBack();
     } else {
-      const catId = typeof lessonId === "string" && lessonId.includes("-") ? lessonId.split("-")[0] : "daily";
+      const catId =
+        typeof lessonId === "string" && lessonId.startsWith("biz")
+          ? "business"
+          : typeof lessonId === "string" && lessonId.startsWith("int")
+          ? "interview"
+          : typeof lessonId === "string" && lessonId.startsWith("trv")
+          ? "travel"
+          : typeof lessonId === "string" && lessonId.includes("-")
+          ? lessonId.split("-")[0]
+          : "daily";
       router.replace({ pathname: "/lessons/[categoryId]", params: { categoryId: catId } });
     }
   };
@@ -940,7 +949,7 @@ export function ScriptRolePlayer({ script, lessonId, onBack, onComplete }: Scrip
           <Text style={styles.completeSubtitle}>Great work! You finished the script.</Text>
           <View style={styles.completeActions}>
             <GradientButton label="Restart" onPress={handleRestart} testID="script-restart-btn" style={styles.wideButton} />
-            <GradientButton label="Back to Lesson" onPress={handleBackToLesson} style={styles.wideButton} />
+            <GradientButton label="Back to Lessons List" onPress={handleBackToLesson} testID="script-back-to-lessons-btn" style={styles.wideButton} />
           </View>
         </View>
       ) : null}

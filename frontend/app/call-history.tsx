@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { api } from "@/src/api/client";
 import { colors, radii, shadow, typography } from "@/src/theme";
-import { ScreenHeader } from "@/src/components/ui";
+import { Avatar, ScreenHeader } from "@/src/components/ui";
 
 export default function CallHistory() {
   const router = useRouter();
@@ -33,7 +33,7 @@ export default function CallHistory() {
               contentContainerStyle={{ padding: 20, paddingBottom: 160 }}
               renderItem={({ item }) => (
                 <View style={styles.row} testID={`call-row-${item.call_id}`}>
-                  <Image source={{ uri: item.partner_avatar }} style={styles.avatar} />
+                  <Avatar uri={item.partner_avatar} name={item.partner_name} size={46} isPremium={Boolean(item.is_premium)} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.name}>{item.partner_name}</Text>
                     <Text style={styles.meta}>{new Date(item.created_at).toLocaleDateString()} · {Math.floor(item.duration_seconds / 60)}m {item.duration_seconds % 60}s</Text>

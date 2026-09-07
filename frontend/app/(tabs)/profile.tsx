@@ -8,7 +8,7 @@ import { useRouter } from "expo-router";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, gradients, radii, shadow, typography } from "@/src/theme";
-import { GlassCard, ProgressRing, SectionTitle } from "@/src/components/ui";
+import { Avatar, GlassCard, ProgressRing, ProTag, SectionTitle } from "@/src/components/ui";
 
 export default function Profile() {
   const { user, refresh, signOut } = useAuth();
@@ -41,20 +41,17 @@ export default function Profile() {
           </View>
 
           <View style={styles.profileCard}>
-            {user.picture ? (
-              <Image source={{ uri: user.picture }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarInitial}>{user.name.charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
-            <Text style={styles.name} testID="profile-name">{user.name}</Text>
+            <Avatar uri={user.picture} name={user.name} size={96} isPremium={user.is_premium} />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 }}>
+              <Text style={styles.name} testID="profile-name">{user.name}</Text>
+              {user.is_premium ? <ProTag size="md" /> : null}
+            </View>
             <Text style={styles.email}>{user.email}</Text>
             <View style={styles.levelBadge}>
               <Ionicons name="school" size={12} color={colors.primary} />
               <Text style={styles.levelText}>{user.english_level}</Text>
               {user.is_premium ? (
-                <View style={styles.premiumTag}><Ionicons name="diamond" size={10} color="#fff" /><Text style={styles.premiumTagText}>PREMIUM</Text></View>
+                <View style={styles.premiumTag}><Ionicons name="star" size={10} color="#fff" /><Text style={styles.premiumTagText}>PREMIUM</Text></View>
               ) : null}
             </View>
           </View>
@@ -117,6 +114,7 @@ export default function Profile() {
             <View style={{ marginTop: 22 }}>
               <SectionTitle title="More" />
               <View style={{ gap: 10 }}>
+                <MenuRow icon="star" label="My Membership" onPress={() => router.push("/membership")} testID="menu-membership" />
                 <MenuRow icon="ribbon" label="Certificates" onPress={() => router.push("/certificates")} testID="menu-certificates" />
                 <MenuRow icon="gift" label="Invite & Earn 20% Off" onPress={() => router.push("/referral")} testID="menu-referral" />
                 <MenuRow icon="podium" label="Leaderboard" onPress={() => router.push("/leaderboard")} testID="menu-leaderboard" />
@@ -173,7 +171,7 @@ const styles = StyleSheet.create({
   premiumCard: { flexDirection: "row", alignItems: "center", padding: 20, borderRadius: radii.xl, gap: 12, ...shadow.strong },
   premiumTitle: { color: "#fff", fontFamily: "Outfit_700Bold", fontSize: 18 },
   premiumSub: { color: "rgba(255,255,255,0.75)", fontFamily: "Manrope_500Medium", fontSize: 12, marginTop: 4 },
-  diamondWrap: { width: 56, height: 56, borderRadius: 999, backgroundColor: "rgba(245,158,11,0.15)", borderColor: colors.gold, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  diamondWrap: { width: 56, height: 56, borderRadius: 999, backgroundColor: "rgba(255,122,0,0.18)", borderColor: colors.premiumOrange, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   achCard: { width: 110, backgroundColor: "#fff", padding: 12, borderRadius: radii.lg, alignItems: "center", ...shadow.soft },
   achLocked: { backgroundColor: "#F1F5F9" },
   achIcon: { width: 52, height: 52, borderRadius: 999, backgroundColor: "#FEF3C7", alignItems: "center", justifyContent: "center" },

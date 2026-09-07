@@ -16,7 +16,7 @@ export default function Certificates() {
   const certs = user?.certificates || [];
 
   const shareCert = async (c: any) => {
-    const msg = `I just earned my ${c.title} on Lingua Franca with a score of ${c.score}/100! 🎉 Learn English with me — get 20% off Premium with my code. https://lingua-franca-6.preview.emergentagent.com`;
+    const msg = `I just earned my ${c.title} on Acuspeak with a score of ${c.score}/100! 🎉 Learn English with me — get 20% off Premium with my code. https://lingua-franca-6.preview.emergentagent.com`;
     try {
       if (Platform.OS === "web") {
         await Clipboard.setStringAsync(msg);
@@ -29,7 +29,7 @@ export default function Certificates() {
   const shareTo = async (network: "whatsapp" | "linkedin" | "twitter", c: any) => {
     let refCode = "";
     try { const r = await api.getReferral(); refCode = r.referral_code; } catch { /* ignore */ }
-    const msg = encodeURIComponent(`I just earned my ${c.title} on Lingua Franca (${c.score}/100)! 🎉 Get 20% off Premium with code ${refCode}: https://lingua-franca-6.preview.emergentagent.com`);
+    const msg = encodeURIComponent(`I just earned my ${c.title} on Acuspeak (${c.score}/100)! 🎉 Get 20% off Premium with code ${refCode}: https://lingua-franca-6.preview.emergentagent.com`);
     const map: Record<string, string> = {
       whatsapp: `https://wa.me/?text=${msg}`,
       linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://lingua-franca-6.preview.emergentagent.com")}&summary=${msg}`,
@@ -79,7 +79,7 @@ export default function Certificates() {
                     </View>
                     <View>
                       <Text style={styles.footerLabel}>Issued by</Text>
-                      <Text style={styles.footerValue}>Lingua Franca</Text>
+                      <Text style={styles.footerValue}>Acuspeak</Text>
                     </View>
                   </View>
                 </View>

@@ -8,7 +8,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming, Eas
 
 import { api } from "@/src/api/client";
 import { colors, gradients, radii, shadow, typography } from "@/src/theme";
-import { ScreenHeader } from "@/src/components/ui";
+import { Avatar, ScreenHeader } from "@/src/components/ui";
 
 type Gender = "any" | "male" | "female";
 
@@ -115,7 +115,7 @@ export default function Match() {
         {status === "found" && partner && (
           <Animated.View entering={FadeIn.duration(400)} style={{ flex: 1, padding: 20, alignItems: "center", justifyContent: "center" }}>
             <Text style={styles.matchedLabel}>MATCH FOUND</Text>
-            <Image source={{ uri: partner.avatar }} style={styles.partnerAvatar} />
+            <Avatar uri={partner.avatar} name={partner.name} size={140} isPremium={Boolean(partner.is_premium)} style={{ marginTop: 22 }} />
             <Text style={styles.partnerName}>{partner.name}</Text>
             <Text style={styles.partnerMeta}>{partner.gender === "male" ? "He/Him" : partner.gender === "female" ? "She/Her" : ""} · {partner.country}</Text>
             <TouchableOpacity onPress={startCall} style={styles.callBtn} activeOpacity={0.9} testID="match-call-btn">

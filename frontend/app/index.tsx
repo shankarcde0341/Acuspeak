@@ -86,7 +86,7 @@ export default function Index() {
       </Animated.View>
 
       <Animated.View style={[styles.wordmarkWrap, wordmarkStyle]}>
-        <Text style={styles.brand}>Lingua Franca</Text>
+        <Text style={styles.brand}>Acuspeak</Text>
         <Text style={styles.tag}>Speak English. Fearlessly.</Text>
       </Animated.View>
     </View>

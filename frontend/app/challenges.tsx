@@ -13,7 +13,7 @@ import { ScreenHeader } from "@/src/components/ui";
 
 export default function Challenges() {
   const router = useRouter();
-  const { refresh } = useAuth();
+  const { refresh, updateUser } = useAuth();
   const [challenges, setChallenges] = useState<any[]>([]);
   const [completed, setCompleted] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,14 +28,16 @@ export default function Challenges() {
   useEffect(() => { load(); }, [load]);
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
-  const complete = async (c: any) => {
+  const complete = async (c: any, index?: number) => {
     if (completed.includes(c.id)) return;
-    if (c.type === "quiz") { router.push("/quiz"); return; }
-    if (c.type === "lesson") { router.push("/(tabs)/practice"); return; }
-    if (c.type === "speak") { router.push("/match"); return; }
+    if (c.id === "c3" || c.type === "quiz" || c.title?.toLowerCase().includes("quiz")) { router.push("/quiz"); return; }
+    if (c.id === "c2" || c.type === "vocab" || c.title?.toLowerCase().includes("words")) { router.push("/vocabulary"); return; }
+    if (index === 0 || c.type === "speak" || c.id === "c1") { router.push("/match"); return; }
+    if (c.type === "lesson") { router.push("/lessons/daily"); return; }
     setProcessing(c.id);
     try {
       const res = await api.completeChallenge(c.id);
+      if (res?.user) updateUser(res.user);
       setCompleted((p) => [...p, c.id]);
       setToast(`+${res.xp_earned} XP earned!`);
       setTimeout(() => setToast(null), 2500);
@@ -73,23 +75,25 @@ export default function Challenges() {
               const done = completed.includes(c.id);
               return (
                 <Animated.View key={c.id} entering={FadeInDown.delay(80 + i * 40).duration(400)} style={{ marginTop: 12 }}>
-                  <View style={[styles.card, done && { opacity: 0.6 }]}>
-                    <View style={[styles.cIcon, done && { backgroundColor: colors.accent }]}>
-                      <Ionicons name={done ? "checkmark" : c.icon} size={22} color="#fff" />
+                  <TouchableOpacity activeOpacity={0.9} onPress={() => complete(c, i)} disabled={done || processing === c.id}>
+                    <View style={[styles.card, done && { opacity: 0.6 }]}>
+                      <View style={[styles.cIcon, done && { backgroundColor: colors.accent }]}>
+                        <Ionicons name={done ? "checkmark" : c.icon} size={22} color="#fff" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cTitle}>{c.title}</Text>
+                        <Text style={styles.cDesc}>{c.description}</Text>
+                        <View style={styles.cReward}><Ionicons name="flash" size={12} color={colors.gold} /><Text style={styles.cRewardText}>+{c.xp} XP</Text></View>
+                      </View>
+                      <TouchableOpacity onPress={() => complete(c, i)} disabled={done || processing === c.id} style={[styles.cBtn, done && styles.cBtnDone]} testID={`challenge-btn-${c.id}`}>
+                        {processing === c.id ? <ActivityIndicator size="small" color={colors.primary} /> : (
+                          <Text style={[styles.cBtnText, done && styles.cBtnTextDone]}>
+                            {done ? "Done" : (i === 0 || c.type === "speak" || c.id === "c1") ? "Speak" : c.type === "quiz" ? "Start" : c.type === "lesson" ? "Learn" : "Claim"}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cTitle}>{c.title}</Text>
-                      <Text style={styles.cDesc}>{c.description}</Text>
-                      <View style={styles.cReward}><Ionicons name="flash" size={12} color={colors.gold} /><Text style={styles.cRewardText}>+{c.xp} XP</Text></View>
-                    </View>
-                    <TouchableOpacity onPress={() => complete(c)} disabled={done || processing === c.id} style={[styles.cBtn, done && styles.cBtnDone]} testID={`challenge-btn-${c.id}`}>
-                      {processing === c.id ? <ActivityIndicator size="small" color={colors.primary} /> : (
-                        <Text style={[styles.cBtnText, done && styles.cBtnTextDone]}>
-                          {done ? "Done" : c.type === "quiz" ? "Start" : c.type === "lesson" ? "Learn" : c.type === "speak" ? "Speak" : "Claim"}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
                 </Animated.View>
               );
             })}

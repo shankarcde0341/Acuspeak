@@ -38,7 +38,7 @@ interface Lesson {
 export default function LessonDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { refresh } = useAuth();
+  const { refresh, updateUser } = useAuth();
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [completing, setCompleting] = useState(false);
   const [xpEarned, setXpEarned] = useState<number | null>(null);
@@ -50,8 +50,23 @@ export default function LessonDetail() {
     })();
   }, [id]);
 
+  const getCatId = () => {
+    if (lesson?.category_id) return lesson.category_id;
+    if (typeof id === "string") {
+      if (id.startsWith("biz")) return "business";
+      if (id.startsWith("int")) return "interview";
+      if (id.startsWith("trv")) return "travel";
+      if (id.startsWith("pub")) return "public";
+      if (id.startsWith("grm")) return "grammar";
+      if (id.startsWith("voc")) return "vocab";
+      if (id.startsWith("prn")) return "pronunciation";
+      if (id.includes("-")) return id.split("-")[0];
+    }
+    return "daily";
+  };
+
   const handleBack = () => {
-    const catId = lesson?.category_id || (typeof id === "string" && id.includes("-") ? id.split("-")[0] : "daily");
+    const catId = getCatId();
     router.replace({ pathname: "/lessons/[categoryId]", params: { categoryId: catId } });
   };
 
@@ -60,8 +75,12 @@ export default function LessonDetail() {
     setCompleting(true);
     try {
       const res = await api.completeLesson(lesson.id);
+      if (res?.user) updateUser(res.user);
       setXpEarned(res.xp_earned);
       await refresh();
+      setTimeout(() => {
+        handleBack();
+      }, 1200);
     } catch (e: any) {
       Alert.alert("Error", e.message);
     } finally {
@@ -106,9 +125,17 @@ export default function LessonDetail() {
           )}
 
           {xpEarned ? (
-            <View style={styles.successCard} testID="lesson-complete-toast">
-              <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
-              <Text style={styles.successText}>Lesson complete! +{xpEarned} XP</Text>
+            <View style={{ marginTop: 24, gap: 12 }}>
+              <View style={styles.successCard} testID="lesson-complete-toast">
+                <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
+                <Text style={styles.successText}>Lesson complete! +{xpEarned} XP</Text>
+              </View>
+              <GradientButton
+                testID="lesson-back-to-list-btn"
+                label="Go to Lessons List"
+                icon="arrow-forward"
+                onPress={handleBack}
+              />
             </View>
           ) : (
             <View style={{ marginTop: 24 }}>

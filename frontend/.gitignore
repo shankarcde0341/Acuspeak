@@ -2,6 +2,8 @@
 
 # dependencies
 node_modules/
+frontend/assets/audio/
+
 
 # Expo
 .expo/
