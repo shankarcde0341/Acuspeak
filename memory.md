@@ -377,6 +377,201 @@ All routes are prefixed `/api`. Auth requires `Authorization: Bearer <session_to
   - **Avatar & Tag Integrations**: Replaced inline profile picture renders with shared `Avatar` component across `index.tsx`, `profile.tsx`, `leaderboard.tsx`, `friends.tsx`, `call-history.tsx`, `room/[id].tsx`, `live.tsx`, and `match.tsx`. Rendered `ProTag` next to premium user names.
   - **Premium Touchpoints**: Updated `premium.tsx` (CTA button, selected plan card border, ribbon, active plan card badge) and `premium/success.tsx` (confirmation screen icon & continue CTA) with warm orange accents.
   - **TypeScript Verification**: Confirmed `npx tsc --noEmit` on frontend passed with 0 errors.
+| POST | `/challenges/{id}/complete` | Mark challenge done |
+| GET | `/quiz` | Quiz questions |
+| POST | `/speaking-test` | Submit speaking test result |
+| GET | `/speaking-test/history` | Speaking test history |
+| GET | `/match` | Get mocked speaking partner |
+| POST | `/calls` | Log a completed call |
+| GET | `/calls` | Call history |
+| GET | `/rooms` | List seeded + user-created rooms |
+| POST | `/rooms` | Create a room |
+| POST | `/rooms/join` | Join a room |
+| GET | `/leaderboard` | Top-20 users by XP |
+| GET | `/achievements` | User achievements |
+| POST | `/friends/request` | Send friend request |
+| GET | `/friends/requests` | List friend requests |
+| POST | `/reports` | Report a user |
+| POST | `/block` | Block a user |
+| GET | `/referral` | Get/generate referral code |
+| POST | `/referral/apply` | Apply a referral code |
+| GET | `/subscription/plans` | Available subscription plans |
+| POST | `/subscription/checkout` | Create Stripe checkout session |
+| GET | `/subscription/status/{session_id}` | Poll checkout status |
+| POST | `/subscription/cancel` | Cancel active user subscription |
+| POST | `/webhook/stripe` | Stripe webhook handler |
+| GET | `/zego/token` | Generate ZEGO voice token |
+
+---
+
+## Frontend Key Files
+
+| File | Purpose |
+|---|---|
+| `frontend/src/api/client.ts` | All API calls; uses `EXPO_PUBLIC_BACKEND_URL` |
+| `frontend/src/context/AuthContext.tsx` | Auth state, session token, user object |
+| `frontend/src/theme.ts` | Design tokens (colors, typography, radii, shadows) |
+| `frontend/src/components/ScriptRolePlayer.tsx` | Interactive lesson conversation player |
+| `frontend/src/components/ui/` | Shared UI: `ScreenHeader`, `GradientButton`, etc. |
+| `frontend/app/(tabs)/index.tsx` | Home/Dashboard tab |
+| `frontend/app/(tabs)/practice.tsx` | Practice tab (lesson categories) |
+| `frontend/app/lesson/[id].tsx` | Lesson detail screen |
+| `frontend/app/lessons/[categoryId].tsx` | Category lesson list |
+| `frontend/app/onboarding.tsx` | Onboarding slides |
+| `frontend/app/login.tsx` | Sign-in screen |
+| `frontend/app/call.tsx` | Mocked call UI |
+| `frontend/app/match.tsx` | Partner matching screen |
+| `frontend/app/speaking-test.tsx` | Speaking test |
+| `frontend/app/premium.tsx` | Subscription/premium screen |
+
+---
+
+## Rules Compliance Status (rules.md audit — 2026-08-08)
+
+| Rule | Status | Notes |
+|---|---|---|
+| 1. Environment Isolation | ✅ Compliant | All secrets in backend `.env` only; never exposed to frontend |
+| 1. Client-Side Protection | ✅ Compliant | Frontend accesses data only via `/api` endpoints |
+| 1. Dependency Minimization | ✅ Compliant | No unnecessary packages added |
+| 2. Silent Failures / Logging | ✅ Acceptable | Uses Python `logging` module (structured); no raw errors sent to client |
+| 2. Obfuscated Responses | ✅ Compliant | Only `HTTPException` with safe messages returned |
+| 2. Error Boundaries | ⚠️ Pending | React Error Boundaries not yet implemented in frontend |
+| 3. Rate Limiting | ⚠️ Pending | No rate-limit middleware on API routes yet — **requires user confirmation before adding** (security middleware change per Rule 5) |
+| 3. Input Sanitization | ✅ Compliant | All request bodies validated via Pydantic models |
+| 4. Directory Separation | ✅ Compliant | `backend/` and `frontend/` are cleanly separated |
+| 4. WebRTC Security | ✅ Compliant | ZEGO token generated server-side with app secret |
+| 5. No Verbose Comments | ✅ Compliant | Code is clean, minimal comments |
+| 5. Strict Typing | ✅ Fixed (2026-08-08) | Replaced `any` types in `lesson/[id].tsx` with `Lesson`, `ContentItem`, `ScriptLine` interfaces |
+| 5. Confirmation for Schema/Security Changes | ✅ Acknowledged | Rate limiting flagged as pending user confirmation |
+
+---
+
+## Known Issues / Pending Work
+
+| Issue | Priority | Notes |
+|---|---|---|
+| OTP in mock mode | Medium | `OTP_MODE` defaults to `mock`; Twilio not wired |
+| Rate limiting absent | High | No middleware on speaking room or profile routes — flag for user before adding |
+| React Error Boundaries | Medium | Not implemented on frontend; crashes may expose raw errors |
+| No Docker/CI manifests | Low | No Dockerfile or GitHub Actions — needed for production |
+| ZEGO secret length | Medium | Must be exactly 32 chars or `/zego/token` returns 500 |
+| `.env` not in repo | Info | Developer must supply `MONGO_URL`, `STRIPE_API_KEY`, `ZEGO_*` etc. |
+
+---
+
+## User Flow Summary
+
+1. **Splash / Onboarding** → `onboarding.tsx`
+2. **Login** → Google OAuth (Emergent) or Phone OTP → `login.tsx`
+3. **Home Dashboard** → streak, XP, word-of-day, continue lesson → `(tabs)/index.tsx`
+4. **Practice** → select category → `(tabs)/practice.tsx` → `lessons/[categoryId].tsx`
+5. **Lesson Detail** → view script conversation or static content → `lesson/[id].tsx`
+   - If `script.length > 0`: renders `ScriptRolePlayer` (interactive)
+   - Else: renders static content cards
+6. **Complete Lesson** → POST `/lessons/complete` → XP awarded
+7. **Speaking Practice** → `Match` → mocked partner → `call.tsx` → call logged
+8. **Speaking Test** → scored evaluation → certificate if score ≥ 80 → `speaking-test.tsx`
+9. **Progress** → achievements, leaderboard, profile → `achievements.tsx`, `leaderboard.tsx`
+
+---
+
+## Notes for Future Agents
+
+- **Always read this file first** before making any changes.
+- **Add a dated entry** to the Change Log below after every successful change.
+- **Do NOT create a separate memory file** — append here only.
+- When adding/removing API endpoints, update the **API Endpoints Reference** table.
+- When adding lesson scripts, follow the **Interactive Lesson Pattern** above (10 lines, named speakers, realistic dialogue).
+- Lesson scripts must be defined as module-level variables BEFORE `LESSONS = [...]` or `LESSONS += [...]` in `server.py`.
+- The `LESSONS` list is currently split into two parts: initial `LESSONS = [...]` (daily + business + interview) and `LESSONS += [...]` (travel) — both must remain in order.
+- Per `rules.md` Rule 5: any change to **database schema** or **security middleware** requires explicit user confirmation before execution.
+
+---
+
+## Change Log
+
+- **2026-07-26**: Created `memory.md` — initial comprehensive project memory covering architecture, features, env, setup, known issues and run instructions.
+
+- **2026-07-26**: Major content & feature updates:
+  - Backend subscription mapping: weekly & quarterly SKUs added.
+  - Removed coins system from backend and frontend.
+  - Added daily minutes left display (Home + Profile).
+  - Image updates for Interview English across 3 frontend files.
+  - Expanded lessons: Daily (11–20), Business (4–20), Interview (3–20), Travel (3–20).
+  - Vocabulary expanded to 50 words (w1–w50).
+  - Quiz expanded to 20 questions (idioms & phrases added).
+
+- **2026-07-27**: Added weekly leaderboard UI support in `leaderboard.tsx` and `api/client.ts`.
+
+- **2026-08-02**: Added interactive lesson pilot scripts for `daily-1`, `business-1`, `interview-1`, `travel-1`. Added `ScriptRolePlayer` to `lesson/[id].tsx`. Local-only recording (no upload).
+
+- **2026-08-08**: Major lesson content restructure:
+  - **Daily English Others lessons** synchronized to match Daily English Introduction format.
+  - **Removed lessons 11–20** from Daily English (now 10 lessons per category).
+  - **Removed IELTS & Exams** category entirely — all lessons, seed rooms, and frontend references (`host-room.tsx`, `onboarding.tsx`, `[categoryId].tsx`, `practice.tsx`, `index.tsx`).
+  - **Removed lessons 11–20** from Business, Interview, and Travel English (all now 10 lessons).
+  - **Added full interactive scripts** for all 40 lessons across 4 categories:
+    - Business English: 10 scripts (`BUSINESS_MEETING_SCRIPT` → `LEADERSHIP_SCRIPT`)
+    - Interview English: 10 scripts (`INTERVIEW_INTRO_SCRIPT` → `INTERVIEW_CLOSING_SCRIPT`)
+    - Travel English: 10 scripts (`TRAVEL_AIRPORT_SCRIPT` → `TRAVEL_PROBLEMS_SCRIPT`)
+  - **Rules compliance audit performed** against `rules.md`:
+    - Fixed `any` types in `frontend/app/lesson/[id].tsx` — replaced with `Lesson`, `ContentItem`, `ScriptLine` interfaces (Rule 5: Strict Typing).
+    - Rate limiting flagged as pending (requires user confirmation per Rule 5 before adding security middleware).
+  - **This memory.md updated** with full current project state, all lesson scripts, rules compliance table, and expanded API reference.
+
+- **2026-08-13**: Repo analysis performed — updated Tech Stack to match `frontend/package.json` (Expo 54, React 19, React Native 0.81.5). No other memory changes required.
+
+- **2026-08-19**: Updated audio mapping for `BUSINESS_MEETING_SCRIPT` (`business-1`) in `ScriptRolePlayer.tsx` to reference all 10 audio files (`Manager_L1.mp3` through `Ravi_L3.mp3`) in `frontend/assets/audio/business_english/business_meeting`. Verified TypeScript & Python checks with 0 errors.
+
+- **2026-08-19**: Updated audio mapping for `PROFESSIONAL_EMAIL_SCRIPT` (`business-2`) in `ScriptRolePlayer.tsx` to reference all 12 audio files (`Anita_L1.mp3` through `Vikram_L6.mp3`) in `frontend/assets/audio/business_english/Email_writing`. Verified TypeScript & Python checks with 0 errors.
+
+- **2026-08-20**: Completed Business English audio mapping & backend script architecture standardization:
+  - **Full Audio Asset Mapping (`ScriptRolePlayer.tsx`)**: Configured static require mappings in `DAILY_AUDIO_ASSETS` for all 10 Business English lessons (`business-1` through `business-10`), covering `business_meeting`, `Email_writing`, `negotiation_deals`, `presentation`, `networking`, `conflict_conversation`, `corporate_culture`, `Remote_work`, `Sales`, and `Leadership`.
+  - **Backend Script Clean-Up (`backend/server.py`)**: Removed inline `audio_url` fields across all 8 Business English script definitions (`NEGOTIATION_SCRIPT`, `PRESENTATION_SCRIPT`, `NETWORKING_SCRIPT`, `DIFFICULT_CONVERSATION_SCRIPT`, `CORPORATE_ETIQUETTE_SCRIPT`, `REMOTE_WORK_SCRIPT`, `SALES_SCRIPT`, and `LEADERSHIP_SCRIPT`) to enforce clean separation of backend script text and frontend Expo local audio asset loading.
+  - **Audio Asset Synchronization**: Created speaker audio file aliases in `frontend/assets/audio/business_english/corporate_culture` (`Nisha_L1.mp3` .. `Nisha_L5.mp3`) and `frontend/assets/audio/business_english/Remote_work` (`Divya_L1.mp3` .. `Divya_L3.mp3`) to align disk filenames with script speaker names.
+  - **Verification**: Verified clean Python compilation (`py_compile`) and TypeScript type-checking (`tsc --noEmit`) with 0 errors.
+
+- **2026-08-20**: Comprehensive Codebase Documentation & Comments:
+  - **Backend (`backend/server.py`)**: Added clear, beginner-friendly docstrings and explanatory comments to every function (auth dependencies, phone OTP handlers, referral management, XP/streak progression, lesson/vocab/challenge routes, speaking tests, live room & call handlers, ZEGO Token04 generation, and Stripe subscription/webhook handlers).
+  - **Frontend (`frontend/src/components/ScriptRolePlayer.tsx`)**: Added comprehensive JSDoc and beginner-friendly comments for all player functions (audio source resolution, player lifecycle cleanup, turn countdown timers, audio mode initialization, script auto-advancement, and mode event handlers).
+  - **Verification**: Re-verified clean Python compilation (`py_compile`) and TypeScript type check (`tsc --noEmit`) with 0 errors.
+
+- **2026-08-24**: Updated Audio Mapping for `INTERVIEW_WEAKNESSES_SCRIPT` (`interview-5`):
+  - Added static require mappings for `interview-5` (`i5-l1` through `i5-l10`) in `DAILY_AUDIO_ASSETS` within `frontend/src/components/ScriptRolePlayer.tsx`.
+  - Mapped lines to audio files in `frontend/assets/audio/interview_english/Weakness` (`Interviewer_L1.mp3` through `Interviewer_L5.mp3` and `Candidate_L1.mp3` through `Candidate_L5.mp3`).
+  - Verified TypeScript compilation (`npx tsc --noEmit`) and Python compilation (`py_compile`) with 0 errors.
+
+- **2026-08-24**: Updated Audio Mapping for `INTERVIEW_TECHNICAL_SCRIPT` (`interview-6`):
+  - Added static require mappings for `interview-6` (`i6-l1` through `i6-l10`) in `DAILY_AUDIO_ASSETS` within `frontend/src/components/ScriptRolePlayer.tsx`.
+  - Mapped lines to audio files in `frontend/assets/audio/interview_english/Technical` (`Interviewer_L1.mp3` through `Interviewer_L5.mp3` and `Candidate_L1.mp3` through `Candidate_L5.mp3`).
+  - Verified TypeScript compilation (`npx tsc --noEmit`) and Python compilation (`py_compile`) with 0 errors.
+
+- **2026-08-24**: Updated Audio Mapping for `INTERVIEW_SALARY_SCRIPT` (`interview-7`):
+  - Added static require mappings for `interview-7` (`i7-l1` through `i7-l10`) in `DAILY_AUDIO_ASSETS` within `frontend/src/components/ScriptRolePlayer.tsx`.
+  - Mapped lines to audio files in `frontend/assets/audio/interview_english/Salary` (`Interviewer_L1.mp3` through `Interviewer_L5.mp3` and `Candidate_L1.mp3` through `Candidate_L5.mp3`).
+  - Verified TypeScript compilation (`npx tsc --noEmit`) and Python compilation (`py_compile`) with 0 errors.
+
+- **2026-08-24**: Updated Audio Mapping for `INTERVIEW_QUESTIONS_SCRIPT` (`interview-8`):
+  - Added static require mappings for `interview-8` (`i8-l1` through `i8-l10`) in `DAILY_AUDIO_ASSETS` within `frontend/src/components/ScriptRolePlayer.tsx`.
+  - Mapped lines to audio files in `frontend/assets/audio/interview_english/Question` (`Interviewer_L1.mp3` through `Interviewer_L5.mp3` and `Candidate_L1.mp3` through `Candidate_L5.mp3`).
+  - Verified TypeScript compilation (`npx tsc --noEmit`) and Python compilation (`py_compile`) with 0 errors.
+
+- **2026-08-24**: Updated Audio Mapping for `INTERVIEW_DIFFICULT_SCRIPT` (`interview-9`):
+  - Created Candidate audio file aliases (`Candidate_L1.mp3` .. `Candidate_L5.mp3`) in `frontend/assets/audio/interview_english/Difficulties`.
+  - Added static require mappings for `interview-9` (`i9-l1` through `i9-l10`) in `DAILY_AUDIO_ASSETS` within `frontend/src/components/ScriptRolePlayer.tsx`.
+  - Verified TypeScript compilation (`npx tsc --noEmit`) and Python compilation (`py_compile`) with 0 errors.
+
+- **2026-08-24**: Updated Audio Mapping for `INTERVIEW_CLOSING_SCRIPT` (`interview-10`):
+  - Added static require mappings for `interview-10` (`i10-l1` through `i10-l10`) in `DAILY_AUDIO_ASSETS` within `frontend/src/components/ScriptRolePlayer.tsx`.
+  - Mapped lines to audio files in `frontend/assets/audio/interview_english/Closing` (`Interviewer_L1.mp3` through `Interviewer_L5.mp3` and `Candidate_L1.mp3` through `Candidate_L5.mp3`).
+  - Verified TypeScript compilation (`npx tsc --noEmit`) and Python compilation (`py_compile`) with 0 errors.
+
+- **2026-09-01**: Added Premium Visual Identity (Orange Accents):
+  - **Design Tokens (`frontend/src/theme.ts`)**: Added `premiumOrange` (`#FF7A00`), `premiumOrangeLight`, `premiumOrangeDark`, `gradients.premiumOrange`, and `gradients.premiumOrangeSoft` alongside existing blue design system tokens.
+  - **Reusable Components (`frontend/src/components/ui/`)**: Built `Avatar` component with `isPremium` prop (rendering solid 2.5px orange ring and bottom-right crown/star badge for premium users) and `ProTag` pill component. Re-exported both from `frontend/src/components/ui.tsx`.
+  - **Avatar & Tag Integrations**: Replaced inline profile picture renders with shared `Avatar` component across `index.tsx`, `profile.tsx`, `leaderboard.tsx`, `friends.tsx`, `call-history.tsx`, `room/[id].tsx`, `live.tsx`, and `match.tsx`. Rendered `ProTag` next to premium user names.
+  - **Premium Touchpoints**: Updated `premium.tsx` (CTA button, selected plan card border, ribbon, active plan card badge) and `premium/success.tsx` (confirmation screen icon & continue CTA) with warm orange accents.
+  - **TypeScript Verification**: Confirmed `npx tsc --noEmit` on frontend passed with 0 errors.
   - **Compliance**: Confirmed zero database schema and security middleware changes were made.
 
 - **2026-09-01**: Immediate Subscription Cancellation & State Revocation:
@@ -385,12 +580,27 @@ All routes are prefixed `/api`. Auth requires `Authorization: Bearer <session_to
   - **Immediate Client-Side State Refresh**: Invokes `refresh()` from `AuthContext` immediately upon cancellation confirmation, instantly updating `user` state across all app components (`Avatar` orange rings, PRO tags, profile header, leaderboard, membership status card) without requiring a re-login.
   - **Verification**: Python compilation (`py_compile`) and TypeScript typecheck (`npx tsc --noEmit`) verified with 0 errors.
 
+- **2026-09-07**: Repository & Call UI Optimization & Full System Audit:
+  - **Build Context & Git untracking**: Untracked local audio binary assets in `frontend/assets/audio/` from Git context to optimize dev builds and reduce repository bloat. Configured `.gitignore` for dev build artifacts.
+  - **Call Screen Animation & Code Formatting (`frontend/app/call.tsx`)**: Refactored call screen animated wave bar styles (`bar1`–`bar7`), cleaned up control action handlers (`endCall`, `report`, `block`, `addFriend`), and structured JSX layouts for improved readability and maintenance.
+  - **Verification**: Verified clean Python backend compilation (`python -m py_compile backend/server.py`) and TypeScript type-checking (`npx tsc --noEmit` in `frontend/`) with 0 errors across the codebase.
 
+- **2026-09-08**: Live Room Credentials & Real User Interaction Integration:
+  - **Backend Implementation (`backend/server.py`)**: Updated `RoomCreate` & `RoomJoin` Pydantic models. Updated `POST /api/rooms` to generate a unique 6-digit numeric `room_id` and 4-digit PIN `password`, saving room state in MongoDB `rooms` and returning pre-formatted shareable text. Updated `POST /api/rooms/join` to validate Room ID and PIN, update participant counts, and issue Zego RTC tokens. Updated `GET /api/rooms` to hide passwords from public listings.
+  - **Frontend API Integration (`frontend/src/api/client.ts`)**: Added `Room`, `CreateRoomRequest`, `CreateRoomResponse`, `JoinRoomRequest`, and `JoinRoomResponse` interfaces with zero `any` usage. Updated `createRoom` and `joinRoom` API helpers.
+  - **Room Hosting & Credentials Modal (`frontend/app/host-room.tsx`)**: Integrated real `createRoom` API call. Added room credentials confirmation modal displaying 6-digit Room ID & 4-digit PIN with `expo-clipboard` copy button and native `Share.share()` integration.
+  - **Room Joining Flow (`frontend/app/(tabs)/live.tsx` & `frontend/app/room/[id].tsx`)**: Added "Join with Room ID & PIN" action card and modal with numeric inputs for Room ID and PIN, backend verification, error alerts, and routing. Updated room call screen to pass password to join API.
+  - **Verification**: Verified clean Python compilation (`python -m py_compile backend/server.py`) and TypeScript type-checking (`npx tsc --noEmit` in `frontend/`) with 0 errors across all files.
 
+- **2026-09-08**: Live Room Reliability, Voice Fix & Video Call Enablement:
+  - **Task 1 — Room Creation & Lifecycle Fixes (`backend/server.py`, `host-room.tsx`, `live.tsx`, `client.ts`)**: Added mandatory room title validation on both frontend (inline UI error state & disabled Create button) and backend (`400 Bad Request` rejection). Added `"Other"` topic option with custom text input. Implemented dynamic host identity and real participants tracking (`participants: [{user_id, name, avatar}]`) in MongoDB `rooms` schema with explicit user approval. Added `GET /api/rooms/{room_id}` detail polling and `POST /api/rooms/{room_id}/end` host authorization guard (403 for non-hosts), automatically routing listeners out when host leaves.
+  - **Task 2 — Voice Unmute Fix (`room/[id].tsx`)**: Resolved voice stream publishing lifecycle using persistent `useRef` instances for Zego RTC engine and stream IDs across React re-renders. Explicitly handled `muteMicrophone(false)` on unmute toggle to guarantee outgoing audio stream resumption.
+  - **Task 3 — Video Call Toggle (`room/[id].tsx`)**: Added Cam On/Off toggle button to room controls. On first tap, requests camera permission (`PermissionsAndroid` on Android, `navigator.mediaDevices` on Web) with inline error handling if denied. On permission grant, toggles local camera preview (`enableCamera` & `startPreview`) without re-prompting.
+  - **Verification**: Python compilation (`python -m py_compile backend/server.py`) and TypeScript type-checking (`npx tsc --noEmit` in `frontend/`) verified with 0 errors.
 
-
-
-
-
-
+- **2026-09-08**: Zego RTC Engine WebRTC Web Client Fix (`room/[id].tsx`, `call.tsx`):
+  - **Root Cause Resolution**: Replaced early return guard (`if (Platform.OS === "web") return;`) with ZEGOCLOUD WebRTC Web Express Engine integration (`zego-express-engine-webrtc`).
+  - **WebRTC PeerConnection Handoff**: Initialized Web engine with server WebSocket endpoint (`wss://webim-${appId}-api.zego.im/ws`), logged into room with server Token04, created local media stream (`zgWeb.createStream`), and invoked `startPublishingStream`, establishing active `RTCPeerConnection` with ICE candidates & real media flow in `chrome://webrtc-internals`.
+  - **Audio/Video Stream & Mute Control**: Mapped `toggleMute` to `mutePublishStreamAudio` & audio track state, `toggleVideo` to `mutePublishStreamVideo` & Web media tracks, and attached `roomStreamUpdate` handlers to auto-play remote audio/video tracks (`startPlayingStream`) via HTML DOM elements.
+  - **Verification**: Verified `npx tsc --noEmit` on frontend and `py_compile` on backend with 0 errors.
 

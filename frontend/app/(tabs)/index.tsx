@@ -115,7 +115,7 @@ export default function Home() {
                   {data.daily_goal_completed_minutes}<Text style={styles.goalUnit}> / {data.daily_goal_minutes} min</Text>
                 </Text>
                 <Text style={styles.goalHint}>Keep going — you&apos;re {Math.round(goalProgress * 100)}% there.</Text>
-                <TouchableOpacity style={styles.goalCta} onPress={() => router.push("/(tabs)/practice")} testID="home-continue-btn">
+                <TouchableOpacity style={styles.goalCta} onPress={() => router.push("/match")} testID="home-continue-btn">
                   <Text style={styles.goalCtaText}>Continue Learning</Text>
                   <Ionicons name="arrow-forward" size={16} color={colors.primary} />
                 </TouchableOpacity>

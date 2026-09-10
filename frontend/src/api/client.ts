@@ -10,6 +10,90 @@ import Constants from "expo-constants";
 
 const TOKEN_KEY = "lf_session_token";
 
+export interface PartnerUser {
+  user_id: string;
+  name: string;
+  avatar: string;
+  gender: string;
+  country: string;
+  is_premium?: boolean;
+}
+
+export interface MatchJoinResponse {
+  status: "searching" | "matched";
+  room_id?: string;
+  partner_id?: string;
+  message?: string;
+}
+
+export interface MatchStatusResponse {
+  status: "idle" | "searching" | "matched" | "expired" | "cancelled";
+  room_id?: string;
+  zego_token?: string;
+  partner?: PartnerUser;
+  message?: string;
+}
+
+export interface MatchCancelResponse {
+  status: "cancelled";
+  message: string;
+}
+
+export interface RoomParticipant {
+  user_id: string;
+  name: string;
+  avatar?: string;
+}
+
+export interface Room {
+  room_id: string;
+  title: string;
+  topic: string;
+  host_id?: string;
+  host_name: string;
+  host_avatar?: string;
+  participant_count: number;
+  participants?: RoomParticipant[];
+  is_private: boolean;
+  is_seed?: boolean;
+  created_at?: string;
+  status?: string;
+  password?: string;
+}
+
+export interface CreateRoomRequest {
+  title?: string;
+  topic?: string;
+  is_private?: boolean;
+}
+
+export interface CreateRoomResponse {
+  room_id: string;
+  password: string;
+  title: string;
+  topic: string;
+  host_id: string;
+  host_name: string;
+  host_avatar?: string;
+  participant_count: number;
+  is_private: boolean;
+  status: string;
+  created_at?: string;
+  share_text: string;
+}
+
+export interface JoinRoomRequest {
+  room_id: string;
+  password?: string;
+}
+
+export interface JoinRoomResponse {
+  ok: boolean;
+  room: Room;
+  token?: string | null;
+  zego_app_id?: number | null;
+}
+
 /**
  * Dynamically resolves the backend base URL.
  * Checks EXPO_PUBLIC_BACKEND_URL first, and if running via Expo Go / Metro,
@@ -162,8 +246,14 @@ export const api = {
   speakingTest: (payload: any) => request<any>("/speaking-test", { method: "POST", body: JSON.stringify(payload) }),
   /** Fetches speaking test evaluation history */
   testHistory: () => request<any>("/speaking-test/history"),
-  /** Triggers partner matching for practice calls */
-  match: (gender: string) => request<any>(`/match?gender=${gender}`, { method: "POST" }),
+  /** Joins the partner matching queue with gender preference */
+  joinMatch: (gender: string = "any") => request<MatchJoinResponse>("/match/join", { method: "POST", body: JSON.stringify({ gender }) }),
+  /** Checks current user matching status in queue */
+  getMatchStatus: () => request<MatchStatusResponse>("/match/status"),
+  /** Cancels active partner matching search */
+  cancelMatch: () => request<MatchCancelResponse>("/match/cancel", { method: "POST" }),
+  /** Legacy partner match trigger */
+  match: (gender: string) => request<MatchJoinResponse>("/match/join", { method: "POST", body: JSON.stringify({ gender }) }),
   /** Logs call metadata after practice call completion */
   logCall: (payload: any) => request<any>("/calls", { method: "POST", body: JSON.stringify(payload) }),
   /** Fetches user call history logs */
@@ -177,11 +267,19 @@ export const api = {
   /** Blocks target user from further interactions */
   block: (target_name: string) => request<any>("/block", { method: "POST", body: JSON.stringify({ target_name, reason: "blocked" }) }),
   /** Fetches active voice practice rooms */
-  rooms: () => request<any>("/rooms"),
-  /** Creates a new voice room */
-  createRoom: (payload: any) => request<any>("/rooms", { method: "POST", body: JSON.stringify(payload) }),
-  /** Joins an existing voice room */
-  joinRoom: (room_id: string) => request<any>("/rooms/join", { method: "POST", body: JSON.stringify({ room_id }) }),
+  rooms: () => request<{ rooms: Room[] }>("/rooms"),
+  /** Fetches details for a single room */
+  getRoom: (room_id: string) => request<{ room: Room }>(`/rooms/${room_id}`),
+  /** Creates a new voice room with 6-digit ID and 4-digit PIN */
+  createRoom: (payload: CreateRoomRequest) => request<CreateRoomResponse>("/rooms", { method: "POST", body: JSON.stringify(payload) }),
+  /** Joins an existing voice room with optional PIN password */
+  joinRoom: (room_id: string, password?: string) => request<JoinRoomResponse>("/rooms/join", { method: "POST", body: JSON.stringify({ room_id, password }) }),
+  /** Ends a room session (host only) */
+  endRoom: (room_id: string) => request<{ ok: boolean; message?: string }>(`/rooms/${room_id}/end`, { method: "POST" }),
+  /** Leaves a room session (ends room if host, removes participant if listener) */
+  leaveRoom: (room_id: string) => request<{ ok: boolean; ended: boolean }>(`/rooms/${room_id}/leave`, { method: "POST" }),
+  /** Removes a target listener from room (host only) */
+  removeParticipant: (room_id: string, user_id: string) => request<{ ok: boolean; message?: string }>(`/rooms/${room_id}/remove-participant`, { method: "POST", body: JSON.stringify({ user_id }) }),
   /** Fetches global leaderboard rankings */
   leaderboard: () => request<any>("/leaderboard"),
   /** Fetches weekly leaderboard rankings */
@@ -198,4 +296,10 @@ export const api = {
   cancelSubscription: () => request<any>("/subscription/cancel", { method: "POST" }),
   /** Fetches ZegoCloud RTC authentication token for voice call room */
   getZegoToken: (room_id: string) => request<any>("/zego/token", { method: "POST", body: JSON.stringify({ room_id }) }),
+  /** Explicitly notifies server that call session has ended */
+  endCallSession: (room_id: string) => request<any>("/call/end", { method: "POST", body: JSON.stringify({ room_id }) }),
+  /** Checks real-time call status for dual-side sync */
+  getCallStatus: (room_id: string) => request<any>(`/call/status/${room_id}`),
+  /** Submits post-call rating (1-5 stars) and feedback comment */
+  submitCallFeedback: (payload: { room_id: string; target_user_id: string; rating: number; comment?: string }) => request<any>("/call/feedback", { method: "POST", body: JSON.stringify(payload) }),
 };

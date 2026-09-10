@@ -1,5 +1,6 @@
 import os
 import uuid
+import random
 import logging
 import httpx
 from pathlib import Path
@@ -96,11 +97,25 @@ class LessonProgressUpdate(BaseModel):
 class VocabAction(BaseModel):
     word_id: str
 
+class JoinMatchRequest(BaseModel):
+    gender: Optional[str] = "any"
+
 class CallLogCreate(BaseModel):
     partner_name: str
     partner_avatar: str
     duration_seconds: int
     partner_gender: str = "any"
+
+class CallEndRequest(BaseModel):
+    room_id: str
+
+class CallFeedbackCreate(BaseModel):
+    room_id: str
+    target_user_id: str
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
+
+ACTIVE_CALL_SESSIONS: Dict[str, Dict[str, Any]] = {}
 
 class FriendRequestCreate(BaseModel):
     to_name: str
@@ -111,12 +126,16 @@ class ReportCreate(BaseModel):
     reason: str
 
 class RoomCreate(BaseModel):
-    title: str
-    topic: str
-    is_private: bool = False
+    title: Optional[str] = "Live Speaking Practice"
+    topic: Optional[str] = "General"
+    is_private: Optional[bool] = False
 
 class RoomJoin(BaseModel):
     room_id: str
+    password: Optional[str] = None
+
+class RemoveParticipantPayload(BaseModel):
+    user_id: str
 
 class CheckoutRequest(BaseModel):
     plan: str  # weekly | monthly | quarterly
@@ -1708,23 +1727,200 @@ async def test_history(user=Depends(get_current_user)):
         r["created_at"] = r["created_at"].isoformat() if isinstance(r.get("created_at"), datetime) else r.get("created_at")
     return {"results": rows}
 
-# ---------- Speak with Real People (mocked) ----------
+# ---------- Speak with Real People (Real Online User Queue) ----------
+async def _cleanup_stale_matches():
+    threshold = datetime.now(timezone.utc) - timedelta(seconds=30)
+    await db.match_queue.update_many(
+        {"status": "searching", "created_at": {"$lt": threshold}},
+        {"$set": {"status": "expired"}}
+    )
+
+@api.post("/match/join")
 @api.post("/match")
-async def find_match(gender: str = "any", user=Depends(get_current_user)):
+async def join_match(payload: Optional[JoinMatchRequest] = None, gender: Optional[str] = None, user=Depends(get_current_user)):
     """
-    API Endpoint: POST /api/match
+    API Endpoint: POST /api/match/join (and POST /api/match)
     
-    Finds a speaking practice partner matching user gender preference and returns a call room ID.
+    Adds user to match_queue and pairs instantly if another online user is searching.
     """
-    import random
-    pool = PARTNER_POOL
-    if gender in ("male", "female"):
-        pool = [p for p in PARTNER_POOL if p["gender"] == gender]
-    if not pool:
-        pool = PARTNER_POOL
-    partner = random.choice(pool)
-    room_id = f"lf_{uuid.uuid4().hex[:16]}"
-    return {"partner": partner, "room_id": room_id}
+    await _cleanup_stale_matches()
+
+    target_gender = "any"
+    if payload and payload.gender:
+        target_gender = payload.gender
+    elif gender:
+        target_gender = gender
+
+    now = datetime.now(timezone.utc)
+    stale_cutoff = now - timedelta(seconds=30)
+
+    # Cancel any previous searching request for this user
+    await db.match_queue.delete_many({"user_id": user["user_id"], "status": "searching"})
+
+    # Search for an active searching candidate (other than self)
+    query = {
+        "user_id": {"$ne": user["user_id"]},
+        "status": "searching",
+        "created_at": {"$gte": stale_cutoff}
+    }
+
+    candidates = await db.match_queue.find(query).sort("created_at", 1).to_list(10)
+    matched_candidate = None
+    for cand in candidates:
+        matched_candidate = cand
+        break
+
+    if matched_candidate:
+        room_id = f"lf_{uuid.uuid4().hex[:16]}"
+        # Atomic lock on candidate
+        res = await db.match_queue.find_one_and_update(
+            {"_id": matched_candidate["_id"], "status": "searching"},
+            {
+                "$set": {
+                    "status": "matched",
+                    "partner_id": user["user_id"],
+                    "room_id": room_id,
+                    "matched_at": now
+                }
+            },
+            return_document=True
+        )
+
+        if res:
+            # Candidate claimed successfully; record current user's match
+            user_match_doc = {
+                "user_id": user["user_id"],
+                "status": "matched",
+                "partner_id": matched_candidate["user_id"],
+                "room_id": room_id,
+                "gender_pref": target_gender,
+                "created_at": now,
+                "matched_at": now
+            }
+            await db.match_queue.insert_one(user_match_doc)
+
+            return {
+                "status": "matched",
+                "room_id": room_id,
+                "partner_id": matched_candidate["user_id"]
+            }
+
+    # No candidate available -> enter queue as searching
+    new_queue_doc = {
+        "user_id": user["user_id"],
+        "status": "searching",
+        "partner_id": None,
+        "room_id": None,
+        "gender_pref": target_gender,
+        "created_at": now
+    }
+    await db.match_queue.insert_one(new_queue_doc)
+
+    return {
+        "status": "searching",
+        "message": "Added to match queue. Polling for partner..."
+    }
+
+@api.get("/match/status")
+async def match_status(user=Depends(get_current_user)):
+    """
+    API Endpoint: GET /api/match/status
+    
+    Short-polling endpoint returning room_id, server-generated ZEGO token, and partner details when matched.
+    """
+    await _cleanup_stale_matches()
+
+    q_entry = await db.match_queue.find_one(
+        {"user_id": user["user_id"]},
+        sort=[("created_at", -1)]
+    )
+
+    if not q_entry:
+        return {"status": "idle"}
+
+    q_status = q_entry.get("status")
+
+    if q_status == "searching":
+        created_at = q_entry.get("created_at")
+        if isinstance(created_at, datetime):
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) - created_at > timedelta(seconds=30):
+                await db.match_queue.update_one(
+                    {"_id": q_entry["_id"]},
+                    {"$set": {"status": "expired"}}
+                )
+                return {"status": "expired", "message": "Search timed out after 30 seconds"}
+        return {"status": "searching"}
+
+    elif q_status == "matched":
+        partner_id = q_entry.get("partner_id")
+        room_id = q_entry.get("room_id")
+
+        partner_user = await db.users.find_one({"user_id": partner_id}, {"_id": 0})
+        if not partner_user:
+            partner_data = {
+                "user_id": partner_id,
+                "name": "Learner",
+                "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb",
+                "gender": "any",
+                "country": "Global",
+                "is_premium": False
+            }
+        else:
+            partner_data = {
+                "user_id": partner_user.get("user_id", partner_id),
+                "name": partner_user.get("name", "Learner"),
+                "avatar": partner_user.get("picture") or partner_user.get("avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb",
+                "gender": partner_user.get("gender", "any"),
+                "country": partner_user.get("country", "Global"),
+                "is_premium": partner_user.get("is_premium", False)
+            }
+
+        zego_token = ""
+        if ZEGO_APP_ID and ZEGO_SERVER_SECRET:
+            try:
+                app_id_int = int(ZEGO_APP_ID)
+                zego_token = _generate_zego_token04(
+                    app_id=app_id_int,
+                    user_id=user["user_id"],
+                    secret=ZEGO_SERVER_SECRET,
+                    effective_time_seconds=3600,
+                    payload=""
+                )
+            except Exception as e:
+                logger.warning(f"Failed to generate ZEGO token: {e}")
+                zego_token = f"mock_token_{room_id}"
+        else:
+            zego_token = f"mock_token_{room_id}"
+
+        return {
+            "status": "matched",
+            "room_id": room_id,
+            "zego_token": zego_token,
+            "partner": partner_data
+        }
+
+    elif q_status == "expired":
+        return {"status": "expired"}
+
+    elif q_status == "cancelled":
+        return {"status": "idle"}
+
+    return {"status": "idle"}
+
+@api.post("/match/cancel")
+async def match_cancel(user=Depends(get_current_user)):
+    """
+    API Endpoint: POST /api/match/cancel
+    
+    Cancels active searching request in match_queue.
+    """
+    await db.match_queue.update_many(
+        {"user_id": user["user_id"], "status": "searching"},
+        {"$set": {"status": "cancelled"}}
+    )
+    return {"status": "cancelled", "message": "Match search cancelled"}
 
 @api.post("/calls")
 async def log_call(payload: CallLogCreate, user=Depends(get_current_user)):
@@ -1758,6 +1954,90 @@ async def call_history(user=Depends(get_current_user)):
     for r in rows:
         r["created_at"] = r["created_at"].isoformat() if isinstance(r.get("created_at"), datetime) else r.get("created_at")
     return {"calls": rows}
+
+@api.post("/call/end")
+@api.post("/calls/end")
+async def end_call(payload: CallEndRequest, user=Depends(get_current_user)):
+    """
+    API Endpoint: POST /api/call/end
+    
+    Real-time call termination endpoint. Updates call session state to ended
+    so both participants immediately sync termination state.
+    """
+    room_id = payload.room_id.strip()
+    if not room_id:
+        raise HTTPException(status_code=400, detail="room_id is required")
+        
+    now = datetime.now(timezone.utc)
+    ACTIVE_CALL_SESSIONS[room_id] = {
+        "room_id": room_id,
+        "status": "ended",
+        "ended_by": user["user_id"],
+        "ended_at": now.isoformat()
+    }
+    
+    await db.call_sessions.update_one(
+        {"room_id": room_id},
+        {
+            "$set": {
+                "room_id": room_id,
+                "status": "ended",
+                "ended_by": user["user_id"],
+                "ended_at": now
+            }
+        },
+        upsert=True
+    )
+    return {"ok": True, "room_id": room_id, "status": "ended"}
+
+@api.get("/call/status/{room_id}")
+@api.get("/calls/status/{room_id}")
+async def get_call_status(room_id: str, user=Depends(get_current_user)):
+    """
+    API Endpoint: GET /api/call/status/{room_id}
+    
+    Checks current status of a call session (active vs ended) for dual-side sync.
+    """
+    if room_id in ACTIVE_CALL_SESSIONS:
+        return ACTIVE_CALL_SESSIONS[room_id]
+        
+    doc = await db.call_sessions.find_one({"room_id": room_id}, {"_id": 0})
+    if doc:
+        if isinstance(doc.get("ended_at"), datetime):
+            doc["ended_at"] = doc["ended_at"].isoformat()
+        ACTIVE_CALL_SESSIONS[room_id] = doc
+        return doc
+        
+    return {"room_id": room_id, "status": "active"}
+
+@api.post("/call/feedback")
+@api.post("/calls/feedback")
+async def submit_call_feedback(payload: CallFeedbackCreate, user=Depends(get_current_user)):
+    """
+    API Endpoint: POST /api/call/feedback
+    
+    Records user rating (1-5 stars) and optional feedback comments for completed call session.
+    """
+    if payload.rating < 1 or payload.rating > 5:
+        raise HTTPException(status_code=400, detail="Rating must be between 1 and 5 stars")
+        
+    feedback_doc = {
+        "feedback_id": f"fb_{uuid.uuid4().hex[:10]}",
+        "rater_id": user["user_id"],
+        "rated_user_id": payload.target_user_id,
+        "room_id": payload.room_id,
+        "rating": payload.rating,
+        "comment": payload.comment.strip() if payload.comment else None,
+        "created_at": datetime.now(timezone.utc),
+    }
+    
+    await db.call_feedback.insert_one(feedback_doc)
+    
+    return {
+        "ok": True,
+        "feedback_id": feedback_doc["feedback_id"],
+        "message": "Feedback submitted successfully"
+    }
 
 @api.post("/friends/request")
 async def send_friend_request(payload: FriendRequestCreate, user=Depends(get_current_user)):
@@ -1913,14 +2193,28 @@ async def zego_token(payload: ZegoTokenRequest, user=Depends(get_current_user)):
     }
 
 # ---------- Live Rooms ----------
+async def _generate_unique_room_id() -> str:
+    """Generates a unique 6-digit numeric room ID string."""
+    for _ in range(10):
+        rid = f"{random.randint(100000, 999999)}"
+        exists = await db.rooms.find_one({"room_id": rid}, {"_id": 1})
+        if not exists:
+            return rid
+    return f"{random.randint(100000, 999999)}"
+
+def _generate_room_password() -> str:
+    """Generates a 4-digit PIN password string."""
+    return f"{random.randint(1000, 9999)}"
+
 @api.get("/rooms")
 async def list_rooms():
     """
     API Endpoint: GET /api/rooms
     
     Returns the list of active live group conversation practice rooms.
+    Hides password credentials from public listings.
     """
-    rows = await db.rooms.find({}, {"_id": 0}).to_list(100)
+    rows = await db.rooms.find({"status": {"$ne": "inactive"}}, {"_id": 0, "password": 0}).to_list(100)
     return {"rooms": rows}
 
 @api.post("/rooms")
@@ -1928,23 +2222,53 @@ async def create_room(payload: RoomCreate, user=Depends(get_current_user)):
     """
     API Endpoint: POST /api/rooms
     
-    Creates a new public or private live audio practice room hosted by the user.
+    Creates a new public or private live audio practice room hosted by the user,
+    generating a unique 6-digit Room ID and 4-digit PIN password.
     """
+    if not payload.title or not payload.title.strip():
+        raise HTTPException(status_code=400, detail="Room title is required")
+
+    room_id = await _generate_unique_room_id()
+    password = _generate_room_password()
+    title = payload.title.strip()
+    topic = (payload.topic or "General").strip()
+    is_private = bool(payload.is_private)
+
+    host_participant = {
+        "user_id": user["user_id"],
+        "name": user.get("name", "Host"),
+        "avatar": user.get("picture") or "https://i.pravatar.cc/150?img=5",
+    }
+
+    share_text = (
+        f"🎙️ Join my Acuspeak Live Practice Room!\n"
+        f"📌 Title: {title}\n"
+        f"💬 Topic: {topic}\n"
+        f"🆔 Room ID: {room_id}\n"
+        f"🔑 Password/PIN: {password}"
+    )
+
     room = {
-        "room_id": f"room_{uuid.uuid4().hex[:10]}",
-        "title": payload.title,
-        "topic": payload.topic,
+        "room_id": room_id,
+        "password": password,
+        "title": title,
+        "topic": topic,
+        "host_id": user["user_id"],
         "host_name": user.get("name", "Host"),
         "host_avatar": user.get("picture") or "https://i.pravatar.cc/150?img=5",
         "participant_count": 1,
-        "is_private": payload.is_private,
+        "participants": [host_participant],
+        "is_private": is_private,
         "is_seed": False,
+        "status": "active",
         "created_at": datetime.now(timezone.utc),
     }
     await db.rooms.insert_one(room)
     room.pop("_id", None)
     if isinstance(room.get("created_at"), datetime):
         room["created_at"] = room["created_at"].isoformat()
+
+    room["share_text"] = share_text
     return room
 
 @api.post("/rooms/join")
@@ -1952,13 +2276,175 @@ async def join_room(payload: RoomJoin, user=Depends(get_current_user)):
     """
     API Endpoint: POST /api/rooms/join
     
-    Increments participant count when a user enters a live audio room.
+    Validates room_id and password/PIN, updates participant list and count, and returns
+    room details along with ZEGO token authentication for the voice call.
     """
-    room = await db.rooms.find_one({"room_id": payload.room_id}, {"_id": 0})
+    room_id = (payload.room_id or "").strip()
+    if not room_id:
+        raise HTTPException(status_code=400, detail="Invalid Room ID or Password")
+
+    room = await db.rooms.find_one({"room_id": room_id, "status": {"$ne": "inactive"}}, {"_id": 0})
     if not room:
-        raise HTTPException(404, "Room not found")
-    await db.rooms.update_one({"room_id": payload.room_id}, {"$inc": {"participant_count": 1}})
-    return {"ok": True}
+        raise HTTPException(status_code=400, detail="Invalid Room ID or Password")
+
+    if user["user_id"] in room.get("removed_users", []):
+        raise HTTPException(status_code=403, detail="You have been removed from this room by the host")
+
+    # Password validation if room requires PIN
+    expected_password = room.get("password")
+    if expected_password is not None and str(expected_password).strip():
+        provided_password = (payload.password or "").strip()
+        if provided_password != str(expected_password).strip():
+            raise HTTPException(status_code=400, detail="Invalid Room ID or Password")
+
+    current_participants = room.get("participants", [])
+    user_p = {
+        "user_id": user["user_id"],
+        "name": user.get("name", "User"),
+        "avatar": user.get("picture") or "https://i.pravatar.cc/150?img=1",
+    }
+    if not any(p.get("user_id") == user["user_id"] for p in current_participants):
+        current_participants.append(user_p)
+        await db.rooms.update_one(
+            {"room_id": room_id},
+            {
+                "$set": {"participants": current_participants},
+                "$inc": {"participant_count": 1},
+            }
+        )
+
+    zego_token_str = None
+    app_id_int = None
+    if ZEGO_APP_ID and ZEGO_SERVER_SECRET:
+        try:
+            app_id_int = int(ZEGO_APP_ID)
+            zego_token_str = _generate_zego_token04(
+                app_id=app_id_int,
+                user_id=user["user_id"],
+                secret=ZEGO_SERVER_SECRET,
+                effective_time_seconds=3600,
+                payload="",
+            )
+        except Exception:
+            logger.warning("Failed to generate Zego token for room join", exc_info=True)
+
+    room_info = {
+        "room_id": room["room_id"],
+        "title": room.get("title", ""),
+        "topic": room.get("topic", ""),
+        "host_id": room.get("host_id", ""),
+        "host_name": room.get("host_name", "Host"),
+        "host_avatar": room.get("host_avatar"),
+        "participant_count": len(current_participants),
+        "participants": current_participants,
+        "is_private": room.get("is_private", False),
+        "status": room.get("status", "active"),
+    }
+
+    return {
+        "ok": True,
+        "room": room_info,
+        "token": zego_token_str,
+        "zego_app_id": app_id_int,
+    }
+
+@api.get("/rooms/{room_id}")
+async def get_room_details(room_id: str):
+    """
+    API Endpoint: GET /api/rooms/{room_id}
+    
+    Returns details and active participants for a single room by room_id.
+    """
+    room = await db.rooms.find_one({"room_id": room_id}, {"_id": 0, "password": 0})
+    if not room or room.get("status") == "inactive":
+        return {
+            "room": {
+                "room_id": room_id,
+                "status": "inactive",
+                "participants": [],
+            }
+        }
+    return {"room": room}
+
+@api.post("/rooms/{room_id}/end")
+async def end_room(room_id: str, user=Depends(get_current_user)):
+    """
+    API Endpoint: POST /api/rooms/{room_id}/end
+    
+    Ends a live room session. Guarded so that only the room host can end the room.
+    """
+    room = await db.rooms.find_one({"room_id": room_id}, {"_id": 0})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    if room.get("host_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Only the host can end this room")
+
+    await db.rooms.update_one({"room_id": room_id}, {"$set": {"status": "inactive"}})
+    return {"ok": True, "message": "Room ended successfully"}
+
+@api.post("/rooms/{room_id}/leave")
+async def leave_room(room_id: str, user=Depends(get_current_user)):
+    """
+    API Endpoint: POST /api/rooms/{room_id}/leave
+    
+    Removes a participant from a room session.
+    If the leaving user is the room host, the entire room session is terminated for all users.
+    """
+    room = await db.rooms.find_one({"room_id": room_id, "status": {"$ne": "inactive"}}, {"_id": 0})
+    if not room:
+        return {"ok": True, "ended": True}
+
+    if room.get("host_id") == user["user_id"]:
+        # Host left -> end room session for all participants on all devices
+        await db.rooms.update_one(
+            {"room_id": room_id},
+            {"$set": {"status": "inactive", "participants": [], "participant_count": 0}}
+        )
+        return {"ok": True, "ended": True}
+    else:
+        # Listener left -> update participant list
+        participants = [p for p in room.get("participants", []) if p.get("user_id") != user["user_id"]]
+        await db.rooms.update_one(
+            {"room_id": room_id},
+            {"$set": {"participants": participants, "participant_count": len(participants)}}
+        )
+        return {"ok": True, "ended": False}
+
+@api.post("/rooms/{room_id}/remove-participant")
+async def remove_participant(room_id: str, payload: RemoveParticipantPayload, user=Depends(get_current_user)):
+    """
+    API Endpoint: POST /api/rooms/{room_id}/remove-participant
+    
+    Removes a target listener from a room. Only the room host can perform this action.
+    """
+    room = await db.rooms.find_one({"room_id": room_id, "status": {"$ne": "inactive"}}, {"_id": 0})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    if room.get("host_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Only the host can remove participants")
+
+    target_user_id = payload.user_id.strip()
+    if target_user_id == room.get("host_id"):
+        raise HTTPException(status_code=400, detail="Cannot remove the room host")
+
+    participants = [p for p in room.get("participants", []) if p.get("user_id") != target_user_id]
+    removed_users = room.get("removed_users", [])
+    if target_user_id not in removed_users:
+        removed_users.append(target_user_id)
+
+    await db.rooms.update_one(
+        {"room_id": room_id},
+        {
+            "$set": {
+                "participants": participants,
+                "participant_count": len(participants),
+                "removed_users": removed_users,
+            }
+        }
+    )
+    return {"ok": True, "message": "Participant removed successfully"}
 
 # ---------- Leaderboard ----------
 @api.get("/leaderboard")

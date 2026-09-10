@@ -325,6 +325,31 @@ class TestAuthenticatedFlow:
         after = next(x for x in api.get(f"{BASE_URL}/api/rooms").json()["rooms"] if x["room_id"] == "seed-1")
         assert after["participant_count"] == before["participant_count"] + 1
 
+    def test_room_leave_host_and_listener(self, api, seeded_user):
+        h = _auth(seeded_user["token"])
+        # Create a room
+        cr = api.post(f"{BASE_URL}/api/rooms", headers=h, json={"title": "Test Leave Room", "topic": "Test", "is_private": False}).json()
+        rid = cr["room_id"]
+
+        # Host leaves room -> room ends for everyone
+        l_res = api.post(f"{BASE_URL}/api/rooms/{rid}/leave", headers=h).json()
+        assert l_res["ok"] is True
+        assert l_res["ended"] is True
+
+        # Room details should show inactive
+        g_res = api.get(f"{BASE_URL}/api/rooms/{rid}").json()
+        assert g_res["room"]["status"] == "inactive"
+
+    def test_remove_participant_by_host(self, api, seeded_user):
+        h = _auth(seeded_user["token"])
+        cr = api.post(f"{BASE_URL}/api/rooms", headers=h, json={"title": "Test Remove Room", "topic": "Test", "is_private": False}).json()
+        rid = cr["room_id"]
+
+        # Attempt to remove non-existent listener by host
+        rem = api.post(f"{BASE_URL}/api/rooms/{rid}/remove-participant", headers=h, json={"user_id": "dummy_listener_999"})
+        assert rem.status_code == 200
+        assert rem.json()["ok"] is True
+
     def test_leaderboard(self, api, seeded_user):
         r = api.get(f"{BASE_URL}/api/leaderboard", headers=_auth(seeded_user["token"]))
         assert r.status_code == 200

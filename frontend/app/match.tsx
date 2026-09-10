@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming, Easing, FadeIn } from "react-native-reanimated";
 
-import { api } from "@/src/api/client";
-import { colors, gradients, radii, shadow, typography } from "@/src/theme";
+import { api, PartnerUser } from "@/src/api/client";
+import { colors, gradients, shadow, typography } from "@/src/theme";
 import { Avatar, ScreenHeader } from "@/src/components/ui";
 
 type Gender = "any" | "male" | "female";
@@ -16,40 +16,102 @@ export default function Match() {
   const router = useRouter();
   const [gender, setGender] = useState<Gender>("any");
   const [status, setStatus] = useState<"idle" | "searching" | "found">("idle");
-  const [partner, setPartner] = useState<any>(null);
+  const [partner, setPartner] = useState<PartnerUser | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
+  const [zegoToken, setZegoToken] = useState<string | null>(null);
 
   const pulse1 = useSharedValue(0);
   const pulse2 = useSharedValue(0);
   const pulse3 = useSharedValue(0);
+  const isSearchingRef = useRef(false);
 
   useEffect(() => {
+    isSearchingRef.current = (status === "searching");
     if (status === "searching") {
       pulse1.value = withRepeat(withTiming(1, { duration: 2500, easing: Easing.out(Easing.quad) }), -1, false);
       pulse2.value = withRepeat(withTiming(1, { duration: 2500, easing: Easing.out(Easing.quad) }), -1, false);
       pulse3.value = withRepeat(withTiming(1, { duration: 2500, easing: Easing.out(Easing.quad) }), -1, false);
-      pulse2.value = withRepeat(withTiming(1, { duration: 2500, easing: Easing.out(Easing.quad) }), -1, false);
     } else {
       pulse1.value = 0; pulse2.value = 0; pulse3.value = 0;
     }
   }, [status, pulse1, pulse2, pulse3]);
+
+  // Short-polling effect when searching for partner
+  useEffect(() => {
+    if (status !== "searching") return;
+
+    let mounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const st = await api.getMatchStatus();
+        if (!mounted) return;
+
+        if (st.status === "matched" && st.partner && st.room_id) {
+          setPartner(st.partner);
+          setRoomId(st.room_id);
+          if (st.zego_token) setZegoToken(st.zego_token);
+          setStatus("found");
+        } else if (st.status === "expired" || st.status === "cancelled" || st.status === "idle") {
+          setStatus("idle");
+        }
+      } catch {
+        /* Ignore transient short-polling fetch error */
+      }
+    }, 2000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [status]);
+
+  // Handle unmount cleanup for searching queue state
+  useEffect(() => {
+    return () => {
+      if (isSearchingRef.current) {
+        api.cancelMatch().catch(() => { });
+      }
+    };
+  }, []);
 
   const ring1 = useAnimatedStyle(() => ({ opacity: 1 - pulse1.value, transform: [{ scale: 0.5 + pulse1.value * 1.5 }] }));
   const ring2 = useAnimatedStyle(() => ({ opacity: 1 - pulse2.value, transform: [{ scale: 0.5 + pulse2.value * 1.5 }] }));
   const ring3 = useAnimatedStyle(() => ({ opacity: 1 - pulse3.value, transform: [{ scale: 0.5 + pulse3.value * 1.5 }] }));
 
   const startMatch = async () => {
-    setStatus("searching");
-    setTimeout(async () => {
-      try {
-        const d = await api.match(gender);
-        setPartner(d.partner);
-        setRoomId(d.room_id);
-        setStatus("found");
-      } catch {
-        setStatus("idle");
+    try {
+      const res = await api.joinMatch(gender);
+      if (res.status === "matched" && res.room_id) {
+        // Instant match with waiting online candidate
+        const st = await api.getMatchStatus();
+        if (st.partner && st.room_id) {
+          setPartner(st.partner);
+          setRoomId(st.room_id);
+          if (st.zego_token) setZegoToken(st.zego_token);
+          setStatus("found");
+          return;
+        }
       }
-    }, 2400);
+      setStatus("searching");
+    } catch {
+      setStatus("idle");
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      await api.cancelMatch();
+    } catch {
+      /* ignore */
+    }
+    setStatus("idle");
+  };
+
+  const handleBack = () => {
+    if (status === "searching") {
+      api.cancelMatch().catch(() => { });
+    }
+    router.back();
   };
 
   const startCall = () => {
@@ -62,6 +124,8 @@ export default function Match() {
         gender: partner.gender,
         country: partner.country,
         room_id: roomId,
+        target_user_id: partner.user_id || "",
+        ...(zegoToken ? { token: zegoToken } : {}),
       },
     });
   };
@@ -70,7 +134,7 @@ export default function Match() {
     <View style={styles.root} testID="match-screen">
       <LinearGradient colors={gradients.premium} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
-        <ScreenHeader title="Random Match" showBack onBack={() => router.back()} />
+        <ScreenHeader title="Random Match" showBack onBack={handleBack} />
 
         {status === "idle" && (
           <View style={{ flex: 1, padding: 20, alignItems: "center", justifyContent: "center" }}>
@@ -106,7 +170,7 @@ export default function Match() {
                 <Ionicons name="mic" size={40} color="#fff" />
               </View>
             </View>
-            <TouchableOpacity onPress={() => setStatus("idle")} style={styles.cancelBtn} testID="match-cancel-btn">
+            <TouchableOpacity onPress={handleCancel} style={styles.cancelBtn} testID="match-cancel-btn">
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
