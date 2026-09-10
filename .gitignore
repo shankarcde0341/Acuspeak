@@ -86,3 +86,9 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+
+# Extra Security Rules
+*.secret
+*.pem
+.env*
+!*.env.example
