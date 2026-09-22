@@ -5,7 +5,9 @@ import { LogBox, View, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as Sentry from "@sentry/react-native";
 
+import "@/src/utils/sentry";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { useAppFonts } from "@/src/hooks/use-app-fonts";
 import { AuthProvider, useAuth } from "@/src/context/AuthContext";
@@ -57,7 +59,7 @@ function AuthGate() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const [iconLoaded, iconError] = useIconFonts();
   const [fontsLoaded, fontsError] = useAppFonts();
 
@@ -66,6 +68,7 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [iconLoaded, iconError, fontsLoaded, fontsError]);
+
 
   if ((!iconLoaded && !iconError) || (!fontsLoaded && !fontsError)) return null;
 
@@ -80,6 +83,8 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+export default Sentry.wrap(RootLayout);
 
 const styles = StyleSheet.create({
   splash: { flex: 1, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },

@@ -72,9 +72,11 @@ export default function Onboarding() {
                 <Ionicons name="chevron-back" size={18} color={colors.primaryDeeper} />
               </TouchableOpacity>
             )}
-            <LinearGradient colors={gradients.primary} style={styles.logoMini}>
-              <Ionicons name="mic" size={16} color="#fff" />
-            </LinearGradient>
+            <Image
+              source={require("@/assets/images/icon.png")}
+              style={styles.logoMiniImage}
+              resizeMode="cover"
+            />
             <Text style={styles.brandSmall}>Acuspeak</Text>
           </View>
           <TouchableOpacity onPress={skip} testID="onboarding-skip-btn">
@@ -171,7 +173,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.9)",
     ...shadow.soft,
   },
-  logoMini: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  logoMiniImage: { width: 32, height: 32, borderRadius: 9, borderWidth: 1, borderColor: "rgba(59,130,246,0.3)" },
   brandSmall: { ...typography.h3, fontSize: 18, color: colors.primaryDeeper },
   skip: { ...typography.body, color: colors.textSecondary, fontFamily: "Manrope_600SemiBold" },
 

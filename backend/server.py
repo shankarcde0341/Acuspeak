@@ -69,6 +69,7 @@ class UserOut(BaseModel):
     referred_by: Optional[str] = None
     referral_count: int = 0
     referral_discount_active: bool = False
+    push_token: Optional[str] = None
 
 class UpdateProfile(BaseModel):
     name: Optional[str] = None
@@ -76,6 +77,7 @@ class UpdateProfile(BaseModel):
     daily_goal_minutes: Optional[int] = None
     picture: Optional[str] = None
     phone: Optional[str] = None
+    push_token: Optional[str] = None
 
 class XPEvent(BaseModel):
     amount: int
@@ -219,6 +221,7 @@ def _user_to_out(u: Dict[str, Any]) -> UserOut:
         referred_by=u.get("referred_by"),
         referral_count=u.get("referral_count", 0),
         referral_discount_active=u.get("referral_discount_active", False),
+        push_token=u.get("push_token"),
     )
 
 def _gen_referral_code(name: str) -> str:
@@ -1403,18 +1406,73 @@ async def apply_referral(payload: ApplyReferral, user=Depends(get_current_user))
 
 
 # ---------- Profile & progression ----------
+class SendNotificationRequest(BaseModel):
+    user_id: Optional[str] = None
+    title: str
+    body: str
+    data: Optional[Dict[str, Any]] = None
+
 @api.put("/profile", response_model=UserOut)
+@api.post("/profile", response_model=UserOut)
 async def update_profile(payload: UpdateProfile, user=Depends(get_current_user)):
     """
-    API Endpoint: PUT /api/profile
+    API Endpoint: PUT /api/profile and POST /api/profile
     
-    Updates user settings such as display name, English proficiency level, or daily practice target minutes.
+    Updates user settings such as display name, English proficiency level, daily goal, or push_token.
     """
     updates = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if updates:
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": updates})
     fresh = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
     return _user_to_out(fresh)
+
+def send_expo_push_notification(token: str, title: str, body: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Helper function: send_expo_push_notification
+    
+    Publishes an Expo push notification using exponent_server_sdk.
+    """
+    if not token or not isinstance(token, str) or not token.startswith("ExponentPushToken"):
+        logger.warning(f"Invalid or missing Expo Push Token: {token}")
+        return {"status": "error", "message": "Invalid Expo push token format"}
+    try:
+        from exponent_server_sdk import PushClient, PushMessage
+        response = PushClient().publish(
+            PushMessage(
+                to=token,
+                title=title,
+                body=body,
+                data=data or {},
+            )
+        )
+        response.validate_response()
+        logger.info(f"Push notification sent successfully: {response.status}")
+        return {"status": "ok", "ticket": response.status}
+    except Exception as exc:
+        logger.error(f"Failed to send push notification: {exc}")
+        return {"status": "error", "message": str(exc)}
+
+@api.post("/notifications/send")
+async def send_notification(payload: SendNotificationRequest, current_user=Depends(get_current_user)):
+    """
+    API Endpoint: POST /api/notifications/send
+    
+    Sends a push notification to target user (or current user if user_id omitted).
+    """
+    target_user_id = payload.user_id or current_user["user_id"]
+    target_user = await db.users.find_one({"user_id": target_user_id}, {"_id": 0})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+    
+    token = target_user.get("push_token")
+    if not token:
+        raise HTTPException(status_code=400, detail="Target user has no push_token registered")
+    
+    res = send_expo_push_notification(token, payload.title, payload.body, payload.data)
+    if res.get("status") != "ok":
+        raise HTTPException(status_code=500, detail=res.get("message", "Failed to send notification"))
+    
+    return {"status": "success", "message": "Notification sent successfully", "ticket": res.get("ticket")}
 
 def _today_iso() -> str:
     """

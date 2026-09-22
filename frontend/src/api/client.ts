@@ -302,4 +302,6 @@ export const api = {
   getCallStatus: (room_id: string) => request<any>(`/call/status/${room_id}`),
   /** Submits post-call rating (1-5 stars) and feedback comment */
   submitCallFeedback: (payload: { room_id: string; target_user_id: string; rating: number; comment?: string }) => request<any>("/call/feedback", { method: "POST", body: JSON.stringify(payload) }),
+  /** Sends a push notification to target user or self */
+  sendNotification: (payload: { user_id?: string; title: string; body: string; data?: any }) => request<any>("/notifications/send", { method: "POST", body: JSON.stringify(payload) }),
 };

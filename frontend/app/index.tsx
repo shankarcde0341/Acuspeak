@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { View, Text, StyleSheet, Dimensions, Platform } from "react-native";
+import { View, Text, StyleSheet, Dimensions, Platform, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
@@ -11,7 +11,6 @@ import Animated, {
   Easing,
   withRepeat,
 } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
 
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, gradients, typography } from "@/src/theme";
@@ -80,14 +79,16 @@ export default function Index() {
           <View style={[styles.dot, { top: -6, left: 42 }]} />
           <View style={[styles.dot, { bottom: -4, right: 8, backgroundColor: colors.gold }]} />
         </Animated.View>
-        <LinearGradient colors={["#93C5FD", "#3B82F6", "#1E40AF"]} style={styles.logoCircle}>
-          <Ionicons name="mic" size={44} color="#fff" />
-        </LinearGradient>
+        <Image
+          source={require("@/assets/images/icon.png")}
+          style={styles.logoImage}
+          resizeMode="cover"
+        />
       </Animated.View>
 
       <Animated.View style={[styles.wordmarkWrap, wordmarkStyle]}>
         <Text style={styles.brand}>Acuspeak</Text>
-        <Text style={styles.tag}>Speak English. Fearlessly.</Text>
+        <Text style={styles.tag}>Your Fluent English Partner</Text>
       </Animated.View>
     </View>
   );
@@ -100,7 +101,7 @@ const styles = StyleSheet.create({
   logoWrap: { alignItems: "center", justifyContent: "center", width: 140, height: 140 },
   orbit: { position: "absolute", width: 140, height: 140, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
   dot: { position: "absolute", width: 10, height: 10, borderRadius: 999, backgroundColor: "#93C5FD" },
-  logoCircle: { width: 92, height: 92, borderRadius: 46, alignItems: "center", justifyContent: "center", shadowColor: "#3B82F6", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.6, shadowRadius: 24, elevation: 20 },
+  logoImage: { width: 104, height: 104, borderRadius: 26, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)", shadowColor: "#3B82F6", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.6, shadowRadius: 24, elevation: 20 },
   wordmarkWrap: { marginTop: 32, alignItems: "center" },
   brand: { ...typography.h1, color: "#fff", fontSize: 34 },
   tag: { ...typography.small, color: "rgba(255,255,255,0.75)", marginTop: 6, letterSpacing: 0.4 },

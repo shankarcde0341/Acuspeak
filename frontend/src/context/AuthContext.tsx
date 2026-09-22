@@ -6,6 +6,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, getToken, setToken, clearToken } from "@/src/api/client";
+import { registerForPushNotificationsAsync } from "@/src/utils/notifications";
 
 /** User profile model shape returned by the backend */
 type User = {
@@ -31,6 +32,7 @@ type User = {
   referred_by?: string | null;
   referral_count: number;
   referral_discount_active: boolean;
+  push_token?: string | null;
 };
 
 /** Context value contract exposed by useAuth() hook */
@@ -57,6 +59,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const syncPushToken = useCallback(async (currentUser: User) => {
+    try {
+      const pushToken = await registerForPushNotificationsAsync();
+      if (pushToken && pushToken !== currentUser.push_token) {
+        console.log("[Auth] Registering push token to backend via /profile:", pushToken);
+        const updated = await api.updateProfile({ push_token: pushToken });
+        if (updated) {
+          setUser(updated);
+        }
+      }
+    } catch (err) {
+      console.warn("[Auth] Push token sync error:", err);
+    }
+  }, []);
+
   /**
    * Initializes (bootstraps) user authentication session on app start.
    * Checks for stored token and verifies it with backend `/auth/me`.
@@ -71,6 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const me = await api.me();
       console.log("[Auth] bootstrap — /me returned user:", me?.user_id);
       setUser(me);
+      if (me) {
+        syncPushToken(me);
+      }
     } catch (e: any) {
       const errMsg = e?.message || String(e);
       console.warn("[Auth] bootstrap failed:", errMsg);
@@ -84,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncPushToken]);
 
   useEffect(() => { bootstrap(); }, [bootstrap]);
 
@@ -101,7 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setToken(res.session_token);
     console.log("[Auth] token saved; setting user", res.user.user_id);
     setUser(res.user);
-  }, []);
+    syncPushToken(res.user);
+  }, [syncPushToken]);
 
   /**
    * Signs in user using phone OTP session token and pre-verified user object.
@@ -112,7 +133,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("[Auth] signInWithPhoneToken — token saved");
     await setToken(session_token);
     setUser(freshUser);
-  }, []);
+    syncPushToken(freshUser);
+  }, [syncPushToken]);
 
   /**
    * Refreshes current user profile state from backend `/auth/me`.
